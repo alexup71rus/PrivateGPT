@@ -4,6 +4,7 @@ import Vue from '@vitejs/plugin-vue'
 import Vuetify, { transformAssetUrls } from 'vite-plugin-vuetify'
 import Fonts from 'unplugin-fonts/vite'
 import VueRouter from 'unplugin-vue-router/vite'
+import svgLoader from 'vite-svg-loader'
 
 // Utilities
 import { defineConfig } from 'vite'
@@ -18,6 +19,7 @@ export default defineConfig({
     Vue({
       template: { transformAssetUrls },
     }),
+    svgLoader(),
     // https://github.com/vuetifyjs/vuetify-loader/tree/master/packages/vite-plugin#readme
     Vuetify({
       autoImport: true,

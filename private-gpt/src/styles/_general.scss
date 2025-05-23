@@ -1,0 +1,32 @@
+:root {
+  --content-margin-y: 125px;
+  --padding-body: 10px;
+  --aside-width--collapsed: 68px;
+  --aside-width--showed: 350px;
+  --header-height: 64px;
+}
+
+body .v-theme--dark {
+  --v-theme-surface: 37 38 44;
+  --v-theme-surface-rgba: 37, 38, 44;
+  --v-theme-background: 26 27 32;
+  --v-theme-surface-variant: 150 150 150;
+  --v-theme-surface-bright: 180 180 180;
+}
+
+body .aside .v-list:nth-child(2) .v-btn--size-default,
+body .aside .v-list:nth-child(3) .v-btn--size-default {
+  --v-btn-size: 0.8rem;
+
+  line-height: 1.2rem;
+  padding-top: .05rem;
+}
+
+.page-container {
+  padding: 12px 12px 12px;
+  max-height: calc(100vh - var(--content-margin-y));
+}
+
+.v-picker.v-sheet {
+  width: 100%;
+}
