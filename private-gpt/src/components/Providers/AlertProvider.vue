@@ -126,6 +126,7 @@ function snackbarColor() {
     v-model="snackbarIsOpen"
     :color="snackbarColor()"
     :timeout="3000"
+    location="top right"
     @after-leave="clearSnackbar"
   >
     <strong v-if="snackbar?.title">{{ snackbar.title }}: </strong>{{ snackbar?.message }}

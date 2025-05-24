@@ -1,30 +1,19 @@
 <script setup lang="ts">
-import { ref, computed, watch, onBeforeUnmount } from "vue";
+import {ref, computed, watch, onBeforeUnmount, onMounted, nextTick} from "vue";
 import { useChatStore } from "@/stores/chat.ts";
 
 const store = useChatStore();
+const textareaRef = ref();
 const messageText = ref('');
-const attachments = ref<File[]>([]);
+const attachment = ref<File | null>(null);
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const isSearch = ref(false);
 const isSending = ref(false);
 
-const attachmentPreviews = ref<{ file: File, url: string }[]>([]);
-
-watch(
-  attachments,
-  (files) => {
-    attachmentPreviews.value.forEach(p => URL.revokeObjectURL(p.url));
-    attachmentPreviews.value = files.map(file => ({
-      file,
-      url: URL.createObjectURL(file),
-    }));
-  },
-  { deep: true, immediate: true }
-);
-
 onBeforeUnmount(() => {
-  attachmentPreviews.value.forEach(p => URL.revokeObjectURL(p.url));
+  if (attachment.value) {
+    URL.revokeObjectURL(URL.createObjectURL(attachment.value));
+  }
 });
 
 function handleAttachClick() {
@@ -33,17 +22,15 @@ function handleAttachClick() {
 
 function handleFilesSelected(event: Event) {
   const input = event.target as HTMLInputElement;
-  if (input.files) {
-    attachments.value.push(...Array.from(input.files));
+  if (input.files && input.files.length > 0) {
+    attachment.value = input.files[0];
     input.value = '';
   }
 }
 
-function removeAttachment(index: number) {
-  attachments.value.splice(index, 1);
+function removeAttachment() {
+  attachment.value = null;
 }
-
-const isImage = (file: File) => file.type.startsWith('image/');
 
 async function sendMessage(event: Event) {
   event.preventDefault();
@@ -53,7 +40,11 @@ async function sendMessage(event: Event) {
   try {
     await store.sendMessage(store.activeChatId, messageText.value);
     messageText.value = '';
-    attachments.value = [];
+    attachment.value = null;
+
+    setTimeout(() => {
+      textareaRef.value?.focus();
+    }, 0);
   } finally {
     isSending.value = false;
   }
@@ -64,6 +55,10 @@ function stopGeneration() {
     store.abortController.abort();
   }
 }
+
+onMounted(() => {
+  nextTick(() => textareaRef.value?.focus());
+});
 </script>
 
 <template>
@@ -71,95 +66,69 @@ function stopGeneration() {
     <input
       ref="fileInputRef"
       type="file"
-      multiple
       hidden
       @change="handleFilesSelected"
     />
 
-    <div v-if="attachmentPreviews.length" class="attachments-scroll">
-      <div
-        v-for="(preview, index) in attachmentPreviews"
-        :key="index"
-        class="attachment"
-      >
-        <v-icon
-          icon="mdi-close"
-          class="remove-icon"
-          size="x-small"
-          @click="removeAttachment(index)"
-        />
-        <img
-          v-if="isImage(preview.file)"
-          :src="preview.url"
-          class="attachment-image"
-        />
-        <div v-else class="attachment-file">
-          {{ preview.file.name }}
-        </div>
-      </div>
+    <div class="chat-input-container">
+      <v-textarea
+        ref="textareaRef"
+        v-model="messageText"
+        class="chat-input"
+        placeholder="Введите сообщение..."
+        auto-grow
+        rows="1"
+        hide-details
+        variant="solo-filled"
+        density="comfortable"
+        :disabled="isSending"
+        @keydown.enter.exact.prevent.stop
+        @keyup.enter.exact.prevent.stop="sendMessage"
+      />
     </div>
 
-    <v-textarea
-      v-model="messageText"
-      class="chat-input"
-      placeholder="Введите сообщение..."
-      auto-grow
-      rows="1"
-      hide-details
-      variant="solo-filled"
-      density="comfortable"
-      :disabled="isSending"
-      @keydown.enter.exact.prevent.stop
-      @keyup.enter.exact.prevent.stop="sendMessage"
-    />
-
     <div class="chat-input-actions">
-      <v-tooltip location="top">
-        <template v-slot:activator="{ props }">
-          <v-btn
-            v-bind="props"
-            icon="mdi-magnify"
-            size="small"
-            variant="text"
-            class="icon-btn"
-            :disabled="isSending"
-            :color="isSearch ? 'blue' : ''"
-            @click="isSearch = !isSearch"
-          />
+      <v-btn
+        variant="tonal"
+        class="file-btn"
+        :disabled="isSending"
+        :color="attachment ? 'blue' : 'white'"
+        @click="handleAttachClick"
+      >
+        <template #prepend>
+          <v-icon>mdi-paperclip</v-icon>
         </template>
-        <span>{{ isSearch ? 'Выключить' : 'Включить' }} поиск</span>
-      </v-tooltip>
+        <span v-if="attachment" v-tooltip:top="attachment.name">{{ attachment.name }}</span>
+        <span v-else>Прикрепить</span>
+        <v-btn
+          v-if="attachment"
+          icon="mdi-close"
+          size="small"
+          variant="text"
+          @click.stop="removeAttachment"
+        />
+      </v-btn>
 
-      <v-tooltip location="top">
-        <template v-slot:activator="{ props }">
-          <v-btn
-            v-bind="props"
-            icon="mdi-paperclip"
-            size="small"
-            variant="text"
-            class="icon-btn"
-            @click="handleAttachClick"
-            :disabled="isSending"
-          />
-        </template>
-        <span>Прикрепить файл</span>
-      </v-tooltip>
-
-      <v-tooltip location="top">
-        <template v-slot:activator="{ props }">
-          <v-btn
-            v-bind="props"
-            :icon="isSending ? 'mdi-stop' : 'mdi-send'"
-            size="small"
-            variant="text"
-            class="icon-btn"
-            :disabled="!messageText.trim()"
-            :color="isSending ? 'error' : undefined"
-            @click="isSending ? stopGeneration() : sendMessage($event)"
-          />
-        </template>
-        <span>{{ isSending ? 'Остановить генерацию' : 'Отправить' }}</span>
-      </v-tooltip>
+      <v-btn
+        prepend-icon="mdi-magnify"
+        variant="tonal"
+        class="search-btn"
+        :disabled="isSending"
+        :color="isSearch ? 'blue' : 'white'"
+        @click="isSearch = !isSearch"
+      >
+        Поиск
+      </v-btn>
+      <v-spacer />
+      <v-btn
+        :icon="isSending ? 'mdi-stop' : 'mdi-send'"
+        size="small"
+        variant="text"
+        class="send-btn"
+        :disabled="!messageText.trim()"
+        :color="isSending ? 'error' : undefined"
+        @click="isSending ? stopGeneration() : sendMessage($event)"
+      />
     </div>
   </div>
 </template>
@@ -173,58 +142,12 @@ function stopGeneration() {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  border-radius: 10px;
+  border-radius: 30px;
 }
 
-.attachments-scroll {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-
-  .attachment {
-    position: relative;
-    flex: 0 0 auto;
-    width: 100px;
-    height: 100px;
-    border-radius: 6px;
-    background: rgba(0, 0, 0, 0.05);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-    padding: 4px;
-    text-align: center;
-    overflow: hidden;
-  }
-
-  .remove-icon {
-    position: absolute;
-    top: 2px;
-    right: 2px;
-    width: 20px;
-    height: 20px;
-    background: rgb(var(--v-theme-surface));
-    object-fit: contain;
-    border-radius: 50%;
-    cursor: pointer;
-    z-index: 2;
-  }
-
-  .attachment-image {
-    width: 130px;
-    height: 130px;
-    object-fit: cover;
-  }
-
-  .attachment-file {
-    display: flex;
-    align-items: center;
-    padding: 8px;
-    word-break: break-word;
-    text-align: center;
-    height: 100px;
-    overflow: auto;
+.chat-input-container {
+  ::v-deep(.v-field) {
+    border-radius: 20px;
   }
 }
 
@@ -235,12 +158,53 @@ function stopGeneration() {
 
 .chat-input-actions {
   display: flex;
-  justify-content: flex-end;
   gap: 8px;
-}
 
-.icon-btn {
-  padding: 0;
-  min-width: 36px;
+  .file-btn {
+    max-width: 200px;
+    overflow: hidden;
+
+    ::v-deep(.v-btn__content) {
+      display: block;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+  }
+
+  .v-btn {
+    --v-btn-height: 32px;
+
+    text-transform: none;
+    font-weight: normal;
+    letter-spacing: normal;
+    border-radius: 9999px;
+    padding: 0 10px 0 10px;
+  }
+
+  .v-btn--icon.v-btn--density-default {
+    width: var(--v-btn-height);
+    height: var(--v-btn-height);
+  }
+
+  ::v-deep(.v-btn__prepend) {
+    margin-inline: -4px 4px;
+  }
+
+  .file-btn.text-blue {
+    padding-right: 40px;
+
+    ::v-deep(.v-btn) {
+      position: absolute;
+      top: 0;
+      right: 0;
+    }
+    ::v-deep(.v-btn .mdi-close) {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+  }
 }
 </style>

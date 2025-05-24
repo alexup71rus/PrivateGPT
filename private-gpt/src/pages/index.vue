@@ -1,22 +1,44 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import {nextTick, onMounted, ref, watch} from "vue";
 import { useChatStore } from "@/stores/chat.ts";
 
 const store = useChatStore();
-const messageText = ref('');
+const chatMessagesRef = ref<HTMLDivElement | null>(null);
+
+const scrollDown = () => {
+  if (chatMessagesRef.value) {
+    chatMessagesRef.value.scrollTo({
+      top: chatMessagesRef.value.scrollHeight,
+      behavior: "auto",
+    });
+  }
+}
+
+watch(
+  () => store.activeChat?.messages[store.activeChat?.messages.length - 1]?.content,
+  async () => {
+    await nextTick();
+    scrollDown();
+  },
+  { deep: true }
+);
+
+onMounted(scrollDown)
 </script>
 
 <template>
   <div class="chat-page">
-    <div class="chat-messages">
-      <div v-for="message in store.activeChat?.messages" :key="message.id" class="message">
-        <div :class="message.role === 'user' ? 'user-message' : 'assistant-message'">
-          {{ message.content }}
-        </div>
+    <div class="chat-messages" ref="chatMessagesRef">
+      <div
+        v-for="message in store.activeChat?.messages"
+        :key="message.id"
+        class="message-wrapper"
+      >
+        <MessageBubble :message="message" />
       </div>
     </div>
 
-    <MessageBox />
+    <MessageBox class="message-box" />
   </div>
 </template>
 
@@ -24,25 +46,26 @@ const messageText = ref('');
 .chat-page {
   display: flex;
   flex-direction: column;
-  margin: 0 auto;
+  max-height: 100vh;
   width: 100%;
-  max-width: 800px;
   height: 100%;
   padding: 16px;
 
   .chat-messages {
+    margin-top: var(--header-height);
     flex: 1;
     overflow-y: auto;
     margin-bottom: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
   }
 
-  .chat-input-box {
-    border-top: 1px solid rgba(0, 0, 0, 0.12);
-    padding-top: 8px;
-  }
-
-  textarea {
-    max-height: 300px;
+  .message-wrapper,
+  .message-box {
+    margin: 0 auto;
+    width: 100%;
+    max-width: 800px;
   }
 }
 </style>

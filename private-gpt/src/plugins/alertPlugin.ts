@@ -50,7 +50,7 @@ export function createAlertPlugin() {
       title: o.title,
       message: o.message,
       type: o.type,
-      isOpen: true
+      isOpen: true,
     }
     setTimeout(() => {
       if (snackbar.value) snackbar.value = null

@@ -1,9 +1,9 @@
 import { defineStore } from 'pinia';
 import { useHttpService } from "@/plugins/httpPlugin";
-import type {OllamaModel, OllamaTagsResponse} from "@/types/ollama.ts";
-import {type Settings, useAppSettings} from "@/composables/useAppSettings.ts";
-import type {Chat, Message} from "@/types/chats.ts";
-import {throttle} from "@/utils/helpers.ts";
+import type { OllamaModel, OllamaTagsResponse } from "@/types/ollama.ts";
+import { type Settings, useAppSettings } from "@/composables/useAppSettings.ts";
+import type { Chat, Message } from "@/types/chats.ts";
+import { throttle } from "@/utils/helpers.ts";
 
 const throttledPersist = throttle((chats: Chat[]) => {
   localStorage.setItem('privateGPTChats', JSON.stringify(chats));
@@ -14,6 +14,7 @@ export const useChatStore = defineStore('chat', {
     const { http } = useHttpService();
     const { settings } = useAppSettings();
     const savedChats = localStorage.getItem('privateGPTChats');
+    const memory = localStorage.getItem('privateGPTMemory');
 
     return {
       http,
@@ -21,6 +22,7 @@ export const useChatStore = defineStore('chat', {
       settings: settings as Settings,
       isAsideOpen: false,
       models: [] as OllamaModel[],
+      memory: memory ? JSON.parse(memory) : [],
       chats: (savedChats ? JSON.parse(savedChats) : []) as Chat[],
       activeChatId: '',
       abortController: null as AbortController | null,
@@ -87,10 +89,15 @@ export const useChatStore = defineStore('chat', {
       return null;
     },
 
-    updateMessage(chatId: string, messageId: string, content: string) {
+    findMessage(chatId: string, messageId: string): Message | undefined {
       const chat = this.chats.find(c => c.id === chatId);
       if (!chat) return;
-      const message = chat.messages.find(m => m.id === messageId);
+      return chat.messages.find(m => m.id === messageId);
+    },
+
+    updateMessage(chatId: string, messageId: string, content: string) {
+      const message = this.findMessage(chatId, messageId);
+
       if (message) {
         message.content = content;
       }
@@ -117,7 +124,7 @@ export const useChatStore = defineStore('chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            model: this.models[0].name,
+            model: this.settings.selectedModel ? this.settings.selectedModel : this.settings.defaultModel || this.models[0].name,
             messages: chat.messages.map(msg => ({ role: msg.role, content: msg.content })),
             stream: true,
           }),
@@ -133,7 +140,16 @@ export const useChatStore = defineStore('chat', {
 
         while (true) {
           const { done, value } = await reader.read();
-          if (done) break;
+
+          if (done) {
+            const message = this.findMessage(chatId, assistantMessageId!);
+
+            if (message) {
+              delete message?.isLoading
+            }
+
+            break;
+          }
 
           const chunk = decoder.decode(value, { stream: true });
           const lines = chunk.split('\n').filter(line => line.trim());
@@ -143,7 +159,7 @@ export const useChatStore = defineStore('chat', {
               const data = JSON.parse(line);
               if (data.message?.role === 'assistant' && data.message.content) {
                 if (!assistantMessageId) {
-                  assistantMessageId = this.addMessage(chatId, { role: 'assistant', content: '' });
+                  assistantMessageId = this.addMessage(chatId, { role: 'assistant', content: '', isLoading: true });
                 }
                 assistantContent += data.message.content;
                 this.updateMessage(chatId, assistantMessageId!, assistantContent);
@@ -190,8 +206,68 @@ export const useChatStore = defineStore('chat', {
       if (!chat) return;
       const index = chat.messages.findIndex(m => m.id === messageId);
       if (index !== -1) {
-        chat.messages.splice(index, 1);
+        chat.messages = chat.messages.slice(0, index);
         this.persistChats();
+      }
+    },
+
+    async regenerateMessage(chatId: string, messageId: string) {
+      const chat = this.chats.find(c => c.id === chatId);
+      if (!chat) return;
+      const index = chat.messages.findIndex(m => m.id === messageId);
+      if (index <= 0) return;
+      const prevMessage = chat.messages[index - 1];
+      if (prevMessage.role !== 'user') return;
+
+      chat.messages = chat.messages.slice(0, index - 1);
+      this.persistChats();
+
+      await this.sendMessage(chatId, prevMessage.content);
+    },
+
+    async saveSummary(chatId: string, messageId: string) {
+      const chat = this.chats.find(c => c.id === chatId);
+      if (!chat) return;
+
+      const messageIndex = chat.messages.findIndex(m => m.id === messageId);
+      const recentMessages = chat.messages.slice(Math.max(0, messageIndex - 3), messageIndex + 1);
+
+      if (!recentMessages.length) {
+        throw new Error('Нет сообщений для создания саммари');
+      }
+
+      const keyword = 'Недостаточно данных';
+
+      try {
+        const response = await this.http.request({
+          method: 'POST',
+          url: `${this.settings.ollamaLink}/api/chat`,
+          data: {
+            model: this.settings.selectedModel || this.settings.defaultModel || this.models[0].name,
+            messages: [
+              {
+                role: 'system',
+                content: `Анализируй последние сообщения и создай краткое описание (1-2 предложения) с ключевыми фактами. Если данных недостаточно, верни "${keyword}".`
+              },
+              ...recentMessages.map(m => ({
+                role: m.role,
+                content: m.content,
+              })),
+            ],
+            stream: false,
+          },
+        });
+
+        const summary = response?.message?.content?.trim();
+        if (summary && !summary.toLowerCase().includes(keyword.toLowerCase())) {
+          this.memory.push(summary);
+          localStorage.setItem('privateGPTMemory', JSON.stringify(this.memory));
+        } else {
+          throw new Error(summary || 'Пустой ответ от модели');
+        }
+      } catch (error) {
+        console.error('Ошибка при сохранении саммари:', error);
+        throw error;
       }
     },
 

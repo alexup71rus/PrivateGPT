@@ -58,8 +58,32 @@ const deleteChat = (chatId: string) => {
   }
 };
 
+const toggleSettings = () => {
+  if (props.isChatPage) {
+    router.push(`/settings`);
+  } else {
+    const activeChat = store.activeChat;
+
+    if (activeChat) {
+      router.push(`/#${activeChat.id}`);
+    } else {
+      onNewChat();
+    }
+  }
+}
+
 onMounted(() => {
-  if (!store.activeChatId && store.chats.length > 0) {
+  const hash = window.location.hash.slice(1);
+
+  if (hash) {
+    const chatExists = store.chats.some(chat => chat.id === hash);
+    if (chatExists) {
+      selectChat(hash);
+      return;
+    }
+  }
+
+  if (store.chats.length > 0) {
     selectChat(store.chats[0].id);
   }
 });
@@ -102,7 +126,7 @@ onMounted(() => {
       </div>
     </transition>
 
-    <v-btn class="settings-btn" icon="mdi-wrench" to="/settings" />
+    <v-btn class="settings-btn" icon="mdi-wrench" :color="!isChatPage ? 'blue' : ''" @click="toggleSettings" />
   </div>
 </template>
 
