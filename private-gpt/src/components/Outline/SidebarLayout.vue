@@ -99,7 +99,7 @@ onMounted(() => {
     <template v-if="isChatPage">
       <v-autocomplete
         class="models-autocomplete"
-        label="Select a model"
+        label="Модель"
         :items="modelNames"
         v-model="selectedModel"
         variant="solo-inverted"

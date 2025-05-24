@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import { useHttpService } from "@/plugins/httpPlugin";
 import type { OllamaModel, OllamaTagsResponse } from "@/types/ollama.ts";
 import { type Settings, useAppSettings } from "@/composables/useAppSettings.ts";
-import type { Chat, Message } from "@/types/chats.ts";
+import type {Chat, MemoryEntry, Message} from "@/types/chats.ts";
 import { throttle } from "@/utils/helpers.ts";
 
 const throttledPersist = throttle((chats: Chat[]) => {
@@ -22,9 +22,10 @@ export const useChatStore = defineStore('chat', {
       settings: settings as Settings,
       isAsideOpen: false,
       models: [] as OllamaModel[],
-      memory: memory ? JSON.parse(memory) : [],
+      memory: (memory ? JSON.parse(memory) : []) as MemoryEntry[],
       chats: (savedChats ? JSON.parse(savedChats) : []) as Chat[],
       activeChatId: '',
+      isSending: false,
       abortController: null as AbortController | null,
     };
   },
@@ -40,6 +41,10 @@ export const useChatStore = defineStore('chat', {
 
     setAside(value: boolean) {
       this.isAsideOpen = value;
+    },
+
+    setIsSending(value: boolean) {
+      this.isSending = value;
     },
 
     initialize() {
@@ -95,11 +100,59 @@ export const useChatStore = defineStore('chat', {
       return chat.messages.find(m => m.id === messageId);
     },
 
-    updateMessage(chatId: string, messageId: string, content: string) {
+    updateMessage(chatId: string, messageId: string, content: string, isLoading?: boolean) {
       const message = this.findMessage(chatId, messageId);
 
       if (message) {
         message.content = content;
+
+        if (isLoading !== undefined) {
+          if (isLoading) {
+            message.isLoading = isLoading;
+          } else {
+            delete message.isLoading;
+          }
+        }
+
+        this.persistChats();
+      }
+    },
+
+    async generateChatTitle(chatId: string) {
+      const chat = this.chats.find(c => c.id === chatId);
+      if (!chat || chat.messages.length < 2) return;
+
+      const messages = chat.messages.slice(0, 2); // Take first user and assistant messages
+
+      try {
+        const response = await this.http.request({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          url: `${this.settings.ollamaLink}/api/chat`,
+          data: {
+            model: 'llama3.1:8b-instruct-q4_0',
+            messages: [
+              {
+                role: 'system',
+                content: 'You are an assistant that generates a concise chat title based on a user message and assistant response. Return a JSON object with a "title" field containing a short, descriptive title (max 50 characters) summarizing the conversation topic.'
+              },
+              ...messages.map(msg => ({ role: msg.role, content: msg.content }))
+            ],
+            stream: false,
+            format: {
+              type: 'object',
+              properties: { title: { type: 'string' } },
+              required: ['title']
+            }
+          }
+        });
+
+        const newTitle = JSON.parse(response?.message?.content)?.title;
+        if (newTitle) {
+          this.renameChat(chatId, newTitle);
+        }
+      } catch (error) {
+        console.error('Error generating chat title:', error);
       }
     },
 
@@ -143,9 +196,12 @@ export const useChatStore = defineStore('chat', {
 
           if (done) {
             const message = this.findMessage(chatId, assistantMessageId!);
-
             if (message) {
-              delete message?.isLoading
+              this.updateMessage(chatId, assistantMessageId!, message.content, false);
+            }
+
+            if (!this.activeChat?.title || this.activeChat?.title === 'Новый чат') {
+              await this.generateChatTitle(chatId);
             }
 
             break;
@@ -233,41 +289,72 @@ export const useChatStore = defineStore('chat', {
       const recentMessages = chat.messages.slice(Math.max(0, messageIndex - 3), messageIndex + 1);
 
       if (!recentMessages.length) {
-        throw new Error('Нет сообщений для создания саммари');
+        console.warn('No messages to summarize');
+        return null;
       }
-
-      const keyword = 'Недостаточно данных';
 
       try {
         const response = await this.http.request({
           method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           url: `${this.settings.ollamaLink}/api/chat`,
           data: {
-            model: this.settings.selectedModel || this.settings.defaultModel || this.models[0].name,
+            model: 'llama3.1:8b-instruct-q4_0',
             messages: [
               {
                 role: 'system',
-                content: `Анализируй последние сообщения и создай краткое описание (1-2 предложения) с ключевыми фактами. Если данных недостаточно, верни "${keyword}".`
+                content: `You are an assistant that extracts factual information about the user based on a short conversation.
+Return a JSON object with a "facts" field — an array of short, self-contained facts about the user.
+Example: {"facts": ["User has a cat named Barsik."]}.
+If there are no strong facts, infer plausible general facts based on the conversation style, preferences, or topics.
+Never return an empty array. Always provide at least one reasonable fact.`
+                /*
+                If there are no strong facts, infer plausible general facts based on the conversation style, preferences, or topics.
+                Never return an empty array. Always provide at least one reasonable fact.
+                ---
+                If there is no factual information, return an empty array.
+                */
               },
-              ...recentMessages.map(m => ({
-                role: m.role,
-                content: m.content,
-              })),
+              ...recentMessages
             ],
             stream: false,
-          },
+            format: {
+              type: 'object',
+              properties: {
+                facts: {
+                  type: 'array',
+                  items: {
+                    type: 'string'
+                  }
+                }
+              },
+              required: ['facts']
+            }
+          }
         });
 
-        const summary = response?.message?.content?.trim();
-        if (summary && !summary.toLowerCase().includes(keyword.toLowerCase())) {
-          this.memory.push(summary);
-          localStorage.setItem('privateGPTMemory', JSON.stringify(this.memory));
-        } else {
-          throw new Error(summary || 'Пустой ответ от модели');
-        }
+    const facts = JSON.parse(response?.message?.content)?.facts;
+
+    if (Array.isArray(facts) && facts.length > 0) {
+      const summary = facts.join('. ') + '.';
+      const now = Date.now();
+
+      this.memory = (this.memory || []).filter(entry => now - entry.timestamp < 1200000);
+
+      this.memory.push({ text: summary, timestamp: now });
+
+      while (this.memory.length > 10) {
+        this.memory.shift();
+      }
+
+      localStorage.setItem('privateGPTMemory', JSON.stringify(this.memory));
+      return summary;
+    }
+
+        return null;
       } catch (error) {
-        console.error('Ошибка при сохранении саммари:', error);
-        throw error;
+        console.error('Error while saving summary:', error);
+        return null;
       }
     },
 

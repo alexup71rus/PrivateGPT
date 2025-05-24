@@ -8,7 +8,6 @@ const messageText = ref('');
 const attachment = ref<File | null>(null);
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const isSearch = ref(false);
-const isSending = ref(false);
 
 onBeforeUnmount(() => {
   if (attachment.value) {
@@ -34,9 +33,10 @@ function removeAttachment() {
 
 async function sendMessage(event: Event) {
   event.preventDefault();
-  if (!messageText.value.trim() || !store.activeChatId || isSending.value) return;
+  if (!messageText.value.trim() || !store.activeChatId || store.isSending) return;
 
-  isSending.value = true;
+  store.setIsSending(true);
+
   try {
     await store.sendMessage(store.activeChatId, messageText.value);
     messageText.value = '';
@@ -46,13 +46,19 @@ async function sendMessage(event: Event) {
       textareaRef.value?.focus();
     }, 0);
   } finally {
-    isSending.value = false;
+    store.setIsSending(false);
   }
 }
 
 function stopGeneration() {
   if (store.abortController) {
     store.abortController.abort();
+    store.setIsSending(false);
+
+    const lastMessage = store.activeChat?.messages[store.activeChat.messages.length - 1];
+    if (lastMessage?.isLoading) {
+      store.updateMessage(store.activeChatId, lastMessage.id, lastMessage.content, false);
+    }
   }
 }
 
@@ -81,7 +87,7 @@ onMounted(() => {
         hide-details
         variant="solo-filled"
         density="comfortable"
-        :disabled="isSending"
+        :disabled="store.isSending"
         @keydown.enter.exact.prevent.stop
         @keyup.enter.exact.prevent.stop="sendMessage"
       />
@@ -91,7 +97,7 @@ onMounted(() => {
       <v-btn
         variant="tonal"
         class="file-btn"
-        :disabled="isSending"
+        :disabled="store.isSending"
         :color="attachment ? 'blue' : 'white'"
         @click="handleAttachClick"
       >
@@ -113,7 +119,7 @@ onMounted(() => {
         prepend-icon="mdi-magnify"
         variant="tonal"
         class="search-btn"
-        :disabled="isSending"
+        :disabled="store.isSending"
         :color="isSearch ? 'blue' : 'white'"
         @click="isSearch = !isSearch"
       >
@@ -121,13 +127,13 @@ onMounted(() => {
       </v-btn>
       <v-spacer />
       <v-btn
-        :icon="isSending ? 'mdi-stop' : 'mdi-send'"
+        :icon="store.isSending ? 'mdi-stop' : 'mdi-send'"
         size="small"
         variant="text"
         class="send-btn"
-        :disabled="!messageText.trim()"
-        :color="isSending ? 'error' : undefined"
-        @click="isSending ? stopGeneration() : sendMessage($event)"
+        :disabled="!messageText.trim() && !store.isSending"
+        :color="store.isSending ? 'error' : undefined"
+        @click="store.isSending ? stopGeneration() : sendMessage($event)"
       />
     </div>
   </div>
