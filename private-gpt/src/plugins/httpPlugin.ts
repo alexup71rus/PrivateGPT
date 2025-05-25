@@ -1,7 +1,7 @@
 import {inject, type Ref, ref} from 'vue'
-import { HttpService } from '@/services/http'
-import { createSnackbarModule } from '@/services/http/modules/http/snackbarModule'
-import { createAuthModule } from "@/services/http/modules/http/authModule";
+import {HttpService} from '@/services/http'
+import {createSnackbarModule} from '@/services/http/modules/http/snackbarModule'
+// import {createAuthModule} from "@/services/http/modules/http/authModule";
 
 const isAuthRequired = ref(false)
 
@@ -9,7 +9,7 @@ export function createHttpService() {
   const http = new HttpService(import.meta.env.VITE_API_URL)
 
   http.useModule(createSnackbarModule())
-  http.useModule(createAuthModule(isAuthRequired))
+  // http.useModule(createAuthModule(isAuthRequired))
 
   return { http, isAuthRequired }
 }
@@ -23,7 +23,7 @@ export function useHttpService() {
 }
 
 export default {
-  install(app) {
+  install(app: any) {
     const { http, isAuthRequired } = createHttpService()
     app.provide('http', { http, isAuthRequired })
     app.config.globalProperties.$http = http

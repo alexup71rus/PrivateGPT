@@ -1,5 +1,5 @@
+import type {AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig} from 'axios'
 import axios from 'axios'
-import type { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 
 export class HttpService {
   private instance: AxiosInstance
@@ -74,7 +74,7 @@ export class HttpService {
 }
 
 export interface HttpModule {
-  onRequest?(config: AxiosRequestConfig): AxiosRequestConfig
+  onRequest?(config: AxiosRequestConfig): InternalAxiosRequestConfig
   onResponse?(response: AxiosResponse): AxiosResponse
   onResponseError?(error: any): Promise<any>
 }

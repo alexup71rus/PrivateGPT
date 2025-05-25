@@ -1,9 +1,11 @@
-import { defineStore } from 'pinia';
-import { useHttpService } from "@/plugins/httpPlugin";
-import type { OllamaModel, OllamaTagsResponse } from "@/types/ollama.ts";
-import { type Settings, useAppSettings } from "@/composables/useAppSettings.ts";
-import type {Chat, MemoryEntry, Message} from "@/types/chats.ts";
-import { throttle } from "@/utils/helpers.ts";
+import {defineStore} from 'pinia';
+import {useHttpService} from '@/plugins/httpPlugin';
+import type {OllamaModel, OllamaTagsResponse} from '@/types/ollama.ts';
+import type {Chat, Message} from '@/types/chats.ts';
+import {throttle} from '@/utils/helpers.ts';
+import {useAppSettings} from '@/composables/useAppSettings.ts';
+import type {ISettings} from '@/types/settings.ts';
+import {loadChats, loadMemory} from '@/utils/storage.ts';
 
 const throttledPersist = throttle((chats: Chat[]) => {
   localStorage.setItem('privateGPTChats', JSON.stringify(chats));
@@ -13,17 +15,13 @@ export const useChatStore = defineStore('chat', {
   state: () => {
     const { http } = useHttpService();
     const { settings } = useAppSettings();
-    const savedChats = localStorage.getItem('privateGPTChats');
-    const memory = localStorage.getItem('privateGPTMemory');
 
     return {
       http,
-      savedChats,
-      settings: settings as Settings,
-      isAsideOpen: false,
+      settings: settings as ISettings,
       models: [] as OllamaModel[],
-      memory: (memory ? JSON.parse(memory) : []) as MemoryEntry[],
-      chats: (savedChats ? JSON.parse(savedChats) : []) as Chat[],
+      memory: loadMemory(),
+      chats: loadChats(),
       activeChatId: '',
       isSending: false,
       abortController: null as AbortController | null,
@@ -33,14 +31,25 @@ export const useChatStore = defineStore('chat', {
     activeChat(state): Chat | undefined {
       return state.chats.find(chat => chat.id === state.activeChatId);
     },
+    selectedModel(): string {
+      return this.settings.selectedModel || this.settings.defaultModel || this.models[0]?.name || '';
+    },
   },
   actions: {
     persistChats() {
       throttledPersist(this.chats);
     },
 
-    setAside(value: boolean) {
-      this.isAsideOpen = value;
+    getChat(chatId: string): Chat | undefined {
+      return this.chats.find(c => c.id === chatId);
+    },
+
+    getMessage(chatId: string, messageId: string): Message | undefined {
+      return this.getChat(chatId)?.messages.find(m => m.id === messageId);
+    },
+
+    shouldGenerateTitle(chat: Chat): boolean {
+      return !chat.title || chat.title === 'Новый чат';
     },
 
     setIsSending(value: boolean) {
@@ -72,20 +81,22 @@ export const useChatStore = defineStore('chat', {
       if (index !== -1) {
         this.chats.splice(index, 1);
         if (this.activeChatId === chatId) {
-          this.activeChatId = this.chats[0]?.id || this.createChat()?.id as string;
+          this.activeChatId = this.chats[0]?.id || this.createChat()?.id || '';
         }
         this.persistChats();
       }
     },
 
     renameChat(chatId: string, newTitle: string) {
-      const chat = this.chats.find(c => c.id === chatId);
-      if (chat) chat.title = newTitle;
-      this.persistChats();
+      const chat = this.getChat(chatId);
+      if (chat) {
+        chat.title = newTitle;
+        this.persistChats();
+      }
     },
 
     addMessage(chatId: string, message: Omit<Message, 'id'>) {
-      const chat = this.chats.find(c => c.id === chatId);
+      const chat = this.getChat(chatId);
       if (chat) {
         const newMessage = { ...message, id: crypto.randomUUID() };
         chat.messages.push(newMessage);
@@ -94,21 +105,13 @@ export const useChatStore = defineStore('chat', {
       return null;
     },
 
-    findMessage(chatId: string, messageId: string): Message | undefined {
-      const chat = this.chats.find(c => c.id === chatId);
-      if (!chat) return;
-      return chat.messages.find(m => m.id === messageId);
-    },
-
     updateMessage(chatId: string, messageId: string, content: string, isLoading?: boolean) {
-      const message = this.findMessage(chatId, messageId);
-
+      const message = this.getMessage(chatId, messageId);
       if (message) {
         message.content = content;
-
         if (isLoading !== undefined) {
           if (isLoading) {
-            message.isLoading = isLoading;
+            message.isLoading = true;
           } else {
             delete message.isLoading;
           }
@@ -119,10 +122,10 @@ export const useChatStore = defineStore('chat', {
     },
 
     async generateChatTitle(chatId: string) {
-      const chat = this.chats.find(c => c.id === chatId);
+      const chat = this.getChat(chatId);
       if (!chat || chat.messages.length < 2) return;
 
-      const messages = chat.messages.slice(0, 2); // Take first user and assistant messages
+      const messages = chat.messages.slice(0, 2);
 
       try {
         const response = await this.http.request({
@@ -130,12 +133,9 @@ export const useChatStore = defineStore('chat', {
           headers: { 'Content-Type': 'application/json' },
           url: `${this.settings.ollamaLink}/api/chat`,
           data: {
-            model: 'llama3.1:8b-instruct-q4_0',
+            model: this.settings.systemModel,
             messages: [
-              {
-                role: 'system',
-                content: 'You are an assistant that generates a concise chat title based on a user message and assistant response. Return a JSON object with a "title" field containing a short, descriptive title (max 50 characters) summarizing the conversation topic.'
-              },
+              { role: 'system', content: this.settings.titlePrompt },
               ...messages.map(msg => ({ role: msg.role, content: msg.content }))
             ],
             stream: false,
@@ -148,9 +148,7 @@ export const useChatStore = defineStore('chat', {
         });
 
         const newTitle = JSON.parse(response?.message?.content)?.title;
-        if (newTitle) {
-          this.renameChat(chatId, newTitle);
-        }
+        if (newTitle) this.renameChat(chatId, newTitle);
       } catch (error) {
         console.error('Error generating chat title:', error);
       }
@@ -160,14 +158,9 @@ export const useChatStore = defineStore('chat', {
       try {
         const chat = this.activeChat;
         if (!chat) throw new Error('No active chat');
+        if (!this.models.length) throw new Error('No models available');
 
-        if (!this.models.length) {
-          throw new Error('No models available');
-        }
-
-        if (this.abortController) {
-          this.abortController.abort();
-        }
+        this.abortController?.abort();
         this.abortController = new AbortController();
 
         const userMessageId = this.addMessage(chatId, { role: 'user', content });
@@ -177,7 +170,7 @@ export const useChatStore = defineStore('chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            model: this.settings.selectedModel ? this.settings.selectedModel : this.settings.defaultModel || this.models[0].name,
+            model: this.selectedModel,
             messages: chat.messages.map(msg => ({ role: msg.role, content: msg.content })),
             stream: true,
           }),
@@ -195,12 +188,12 @@ export const useChatStore = defineStore('chat', {
           const { done, value } = await reader.read();
 
           if (done) {
-            const message = this.findMessage(chatId, assistantMessageId!);
-            if (message) {
-              this.updateMessage(chatId, assistantMessageId!, message.content, false);
+            if (assistantMessageId) {
+              const message = this.getMessage(chatId, assistantMessageId);
+              if (message) this.updateMessage(chatId, assistantMessageId, message.content, false);
             }
 
-            if (!this.activeChat?.title || this.activeChat?.title === 'Новый чат') {
+            if (this.activeChat && this.shouldGenerateTitle(this.activeChat)) {
               await this.generateChatTitle(chatId);
             }
 
@@ -214,9 +207,7 @@ export const useChatStore = defineStore('chat', {
             try {
               const data = JSON.parse(line);
               if (data.message?.role === 'assistant' && data.message.content) {
-                if (!assistantMessageId) {
-                  assistantMessageId = this.addMessage(chatId, { role: 'assistant', content: '', isLoading: true });
-                }
+                assistantMessageId ??= this.addMessage(chatId, { role: 'assistant', content: '', isLoading: true });
                 assistantContent += data.message.content;
                 this.updateMessage(chatId, assistantMessageId!, assistantContent);
               }
@@ -224,11 +215,6 @@ export const useChatStore = defineStore('chat', {
               console.error('Error parsing chunk:', e);
             }
           }
-        }
-
-        if (!assistantMessageId) {
-          this.deleteMessage(chatId, userMessageId);
-          throw new Error('No assistant response received');
         }
 
         this.persistChats();
@@ -244,9 +230,10 @@ export const useChatStore = defineStore('chat', {
       }
     },
 
-    editMessage(chatId: string, messageId: string, newContent: string, dropFollowing: boolean = false) {
-      const chat = this.chats.find(c => c.id === chatId);
+    editMessage(chatId: string, messageId: string, newContent: string, dropFollowing = false) {
+      const chat = this.getChat(chatId);
       if (!chat) return;
+
       const index = chat.messages.findIndex(m => m.id === messageId);
       if (index !== -1) {
         chat.messages[index].content = newContent;
@@ -258,8 +245,9 @@ export const useChatStore = defineStore('chat', {
     },
 
     deleteMessage(chatId: string, messageId: string) {
-      const chat = this.chats.find(c => c.id === chatId);
+      const chat = this.getChat(chatId);
       if (!chat) return;
+
       const index = chat.messages.findIndex(m => m.id === messageId);
       if (index !== -1) {
         chat.messages = chat.messages.slice(0, index);
@@ -268,10 +256,12 @@ export const useChatStore = defineStore('chat', {
     },
 
     async regenerateMessage(chatId: string, messageId: string) {
-      const chat = this.chats.find(c => c.id === chatId);
+      const chat = this.getChat(chatId);
       if (!chat) return;
+
       const index = chat.messages.findIndex(m => m.id === messageId);
       if (index <= 0) return;
+
       const prevMessage = chat.messages[index - 1];
       if (prevMessage.role !== 'user') return;
 
@@ -282,16 +272,11 @@ export const useChatStore = defineStore('chat', {
     },
 
     async saveSummary(chatId: string, messageId: string) {
-      const chat = this.chats.find(c => c.id === chatId);
+      const chat = this.getChat(chatId);
       if (!chat) return;
 
       const messageIndex = chat.messages.findIndex(m => m.id === messageId);
       const recentMessages = chat.messages.slice(Math.max(0, messageIndex - 3), messageIndex + 1);
-
-      if (!recentMessages.length) {
-        console.warn('No messages to summarize');
-        return null;
-      }
 
       try {
         const response = await this.http.request({
@@ -299,23 +284,10 @@ export const useChatStore = defineStore('chat', {
           headers: { 'Content-Type': 'application/json' },
           url: `${this.settings.ollamaLink}/api/chat`,
           data: {
-            model: 'llama3.1:8b-instruct-q4_0',
+            model: this.settings.systemModel,
             messages: [
-              {
-                role: 'system',
-                content: `You are an assistant that extracts factual information about the user based on a short conversation.
-Return a JSON object with a "facts" field — an array of short, self-contained facts about the user.
-Example: {"facts": ["User has a cat named Barsik."]}.
-If there are no strong facts, infer plausible general facts based on the conversation style, preferences, or topics.
-Never return an empty array. Always provide at least one reasonable fact.`
-                /*
-                If there are no strong facts, infer plausible general facts based on the conversation style, preferences, or topics.
-                Never return an empty array. Always provide at least one reasonable fact.
-                ---
-                If there is no factual information, return an empty array.
-                */
-              },
-              ...recentMessages
+              { role: 'system', content: this.settings.memoryPrompt },
+              ...recentMessages,
             ],
             stream: false,
             format: {
@@ -323,9 +295,7 @@ Never return an empty array. Always provide at least one reasonable fact.`
               properties: {
                 facts: {
                   type: 'array',
-                  items: {
-                    type: 'string'
-                  }
+                  items: { type: 'string' }
                 }
               },
               required: ['facts']
@@ -333,23 +303,21 @@ Never return an empty array. Always provide at least one reasonable fact.`
           }
         });
 
-    const facts = JSON.parse(response?.message?.content)?.facts;
+        const facts = JSON.parse(response?.message?.content)?.facts;
+        if (Array.isArray(facts) && facts.length > 0) {
+          const summary = facts.join('. ') + '.';
+          const now = Date.now();
 
-    if (Array.isArray(facts) && facts.length > 0) {
-      const summary = facts.join('. ') + '.';
-      const now = Date.now();
+          this.memory = (this.memory || []).filter(entry => now - entry.timestamp < 1200000);
+          this.memory.push({ text: summary, timestamp: now });
 
-      this.memory = (this.memory || []).filter(entry => now - entry.timestamp < 1200000);
+          while (this.memory.length > 10) {
+            this.memory.shift();
+          }
 
-      this.memory.push({ text: summary, timestamp: now });
-
-      while (this.memory.length > 10) {
-        this.memory.shift();
-      }
-
-      localStorage.setItem('privateGPTMemory', JSON.stringify(this.memory));
-      return summary;
-    }
+          localStorage.setItem('privateGPTMemory', JSON.stringify(this.memory));
+          return summary;
+        }
 
         return null;
       } catch (error) {

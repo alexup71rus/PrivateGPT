@@ -1,46 +1,29 @@
-import { reactive, computed, watch } from 'vue';
-
-export interface Settings {
-  ollamaLink: string;
-  selectedModel: string;
-  defaultModel: string;
-  temperature: number;
-  theme: 'light' | 'dark';
-}
-
-const DEFAULT_SETTINGS: Settings = {
-  ollamaLink: 'http://localhost:11434',
-  selectedModel: '',
-  defaultModel: '',
-  temperature: 0.7,
-  theme: 'light',
-} as const;
+import {computed, reactive, watch} from 'vue';
+import {DEFAULT_SETTINGS, type ISettings} from "@/types/settings.ts";
 
 export function useAppSettings() {
-  // Load initial settings from localStorage or use defaults
-  const savedSettings = localStorage.getItem('privateGPTSettings');
-  const settings: Settings = reactive(
-    savedSettings ? JSON.parse(savedSettings) : { ...DEFAULT_SETTINGS }
-  );
+  const saved = localStorage.getItem('privateGPTSettings');
+  const parsed = saved ? JSON.parse(saved) : {};
+  const settings: ISettings = reactive({ ...DEFAULT_SETTINGS, ...parsed });
 
-  // Save settings to localStorage on change
   watch(
     settings,
     (newSettings) => {
-      localStorage.setItem('privateGPTSettings', JSON.stringify(newSettings));
+      const current = localStorage.getItem('privateGPTSettings');
+      const updated = JSON.stringify(newSettings);
+      if (current !== updated) {
+        localStorage.setItem('privateGPTSettings', updated);
+      }
     },
     { deep: true }
   );
 
-  // Getter for dark theme
   const isDarkTheme = computed(() => settings.theme === 'dark');
 
-  // Update settings
-  const updateSettings = (updates: Partial<Settings>) => {
+  const updateSettings = (updates: Partial<ISettings>) => {
     Object.assign(settings, updates);
   };
 
-  // Reset to default settings
   const resetSettings = () => {
     Object.assign(settings, { ...DEFAULT_SETTINGS });
   };

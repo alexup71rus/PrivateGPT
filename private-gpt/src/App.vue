@@ -1,20 +1,18 @@
 <script lang="ts" setup>
 import AlertProvider from "@/components/Providers/AlertProvider.vue";
 import {useChatStore} from "@/stores/chat.ts";
-import {computed, onMounted} from "vue";
-import {useRoute} from "vue-router";
+import {onMounted} from "vue";
+import {useAppRouting} from "@/composables/useAppRouting.ts";
+import {useAppStore} from "@/stores/app.ts";
 
-const route = useRoute();
-const store = useChatStore();
-
+const app = useAppStore();
+const chat = useChatStore();
+const { isChatPage } = useAppRouting();
 
 onMounted(async () => {
-  await store.fetchModels();
-  store.initialize();
-})
-
-// typed router shows pages names
-const isChatPage = computed(() => route.name === '/');
+  await chat.fetchModels();
+  chat.initialize();
+});
 </script>
 
 <template>
@@ -22,20 +20,16 @@ const isChatPage = computed(() => route.name === '/');
     <AlertProvider />
     <v-main>
       <div
-        class="aside"
-        :class="{ 'aside--opened': store.isAsideOpen }"
+        :class="{ 'sidebar--opened': app.isAsideOpen }"
+        class="sidebar"
       >
         <SidebarLayout :isChatPage="isChatPage" />
       </div>
 
       <div class="main">
-        <AppHeader />
-        <div
-          class="content"
-        >
+        <div class="content">
           <router-view />
         </div>
-        <AppFooter />
       </div>
     </v-main>
   </v-app>
@@ -46,20 +40,16 @@ const isChatPage = computed(() => route.name === '/');
   display: flex;
 }
 
-.aside {
-
-}
-
 .main {
   display: flex;
   flex-direction: column;
   width: 100%;
-  height: 100%;
+  height: var(--main-height);
 }
 
 .content {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  height: var(--main-height);
 }
 </style>

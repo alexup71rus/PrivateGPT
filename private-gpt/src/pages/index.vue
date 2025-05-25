@@ -1,37 +1,21 @@
-<script setup lang="ts">
-import {nextTick, onMounted, ref, watch} from "vue";
-import { useChatStore } from "@/stores/chat.ts";
+<script lang="ts" setup>
+import {computed, ref, watch} from "vue";
+import {useChatStore} from "@/stores/chat.ts";
+import {useChatScroll} from "@/composables/useChatScroll.ts";
 
-const store = useChatStore();
-const chatMessagesRef = ref<HTMLDivElement | null>(null);
-const chatTitle = ref(store.activeChat?.title ?? '');
-
-const scrollDown = () => {
-  if (chatMessagesRef.value) {
-    chatMessagesRef.value.scrollTo({
-      top: chatMessagesRef.value.scrollHeight,
-      behavior: "auto",
-    });
-  }
-}
-
-watch(
-  () => store.activeChat?.messages[store.activeChat?.messages.length - 1]?.content,
-  async () => {
-    await nextTick();
-    scrollDown();
-  },
-  { deep: true }
-);
+const chat = useChatStore();
+const chatTitle = ref(chat.activeChat?.title ?? '');
+const messages = computed(() => chat.activeChat?.messages ?? []);
+const { chatMessagesRef } = useChatScroll(messages);
+const isLoading = computed(() => chat.activeChat?.messages[chat.activeChat.messages.length - 1]?.role === 'user');
 
 watch(() => chatTitle.value || '', (newTitle: string) => {
-  store.renameChat(store.activeChatId, newTitle);
-})
-watch(() => store.activeChat?.title || '', (newTitle: string) => {
-  chatTitle.value = newTitle;
-})
+  chat.renameChat(chat.activeChatId, newTitle);
+});
 
-onMounted(scrollDown)
+watch(() => chat.activeChat?.title || '', (newTitle: string) => {
+  chatTitle.value = newTitle;
+});
 </script>
 
 <template>
@@ -41,16 +25,16 @@ onMounted(scrollDown)
 
     </div>
 
-    <div class="chat-messages" ref="chatMessagesRef">
+    <div v-if="chat.activeChat" ref="chatMessagesRef" class="chat-messages">
       <div
-        v-for="message in store.activeChat?.messages"
+        v-for="message in chat.activeChat?.messages"
         :key="message.id"
         class="message-wrapper"
       >
         <MessageBubble :message="message" />
       </div>
 
-      <div v-if="store.activeChat?.messages[store.activeChat?.messages.length-1]?.role === 'user'" class="loader">
+      <div v-if="isLoading" class="loader">
         <v-progress-circular
           color="primary"
           indeterminate
@@ -62,8 +46,11 @@ onMounted(scrollDown)
   </div>
 </template>
 
-<style scoped lang="scss">
+<style lang="scss" scoped>
 .chat-page {
+  --chat-title-max-width: 300px;
+  --message-max-width: 800px;
+
   display: flex;
   flex-direction: column;
   max-height: 100vh;
@@ -74,7 +61,7 @@ onMounted(scrollDown)
   .chat-title {
     margin-left: auto;
     width: 100%;
-    max-width: 300px;
+    max-width: var(--chat-title-max-width);
   }
 
   .chat-messages {
@@ -90,7 +77,7 @@ onMounted(scrollDown)
   .message-box {
     margin: 0 auto;
     width: 100%;
-    max-width: 800px;
+    max-width: var(--message-max-width);
   }
 
   .loader {

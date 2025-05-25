@@ -1,19 +1,24 @@
-<script setup lang="ts">
-import { useChatStore } from "@/stores/chat.ts";
-import { computed, onMounted, ref } from "vue";
-import { useAppSettings } from "@/composables/useAppSettings.ts";
-import { useRouter } from "vue-router";
+<script lang="ts" setup>
+import {useChatStore} from "@/stores/chat.ts";
+import {computed, onMounted, ref} from "vue";
+import {useAppSettings} from "@/composables/useAppSettings.ts";
+import {useRouter} from "vue-router";
+import {useChatActions} from "@/composables/useChatActions.ts";
 import Logo from "@/assets/logo.svg";
+import type {ChatModel} from "@/types/chats.ts";
+import {useAppStore} from "@/stores/app.ts";
 
 const props = defineProps<{
-  isChatPage: boolean
+  isChatPage: boolean;
 }>();
 
 const router = useRouter();
-const store = useChatStore();
+const app = useAppStore();
+const chat = useChatStore();
 const { settings, updateSettings } = useAppSettings();
+const { onNewChat, selectChat, deleteChat } = useChatActions();
 
-const modelNames = computed(() => store.models?.map((model: any) => model.name) || []);
+const modelNames = computed(() => chat.models?.map((model: ChatModel) => model.name) || []);
 const selectedModel = ref(settings.defaultModel);
 
 const isChangedModel = computed(() => {
@@ -26,43 +31,11 @@ const setDefaultModel = () => {
   }
 };
 
-const onNewChat = () => {
-  const activeChat = store.activeChat;
-  let chat;
-
-  if (activeChat && activeChat.messages.length === 0) {
-    chat = activeChat;
-  } else {
-    chat = store.createChat();
-  }
-
-  router.push(`/#${chat.id}`);
-};
-
-const selectChat = (chatId: string) => {
-  store.activeChatId = chatId;
-  router.push(`/#${chatId}`);
-};
-
-const deleteChat = (chatId: string) => {
-  if (store.chats.length === 1) {
-    const chat = store.chats[0];
-    chat.messages = [];
-    chat.title = 'Новый чат';
-    selectChat(chat.id);
-  } else {
-    store.deleteChat(chatId);
-    if (store.chats.length > 0) {
-      selectChat(store.chats[0].id);
-    }
-  }
-};
-
 const toggleSettings = () => {
   if (props.isChatPage) {
     router.push(`/settings`);
   } else {
-    const activeChat = store.activeChat;
+    const activeChat = chat.activeChat;
 
     if (activeChat) {
       router.push(`/#${activeChat.id}`);
@@ -70,63 +43,70 @@ const toggleSettings = () => {
       onNewChat();
     }
   }
-}
+};
 
-onMounted(() => {
+const initializeChat = () => {
   const hash = window.location.hash.slice(1);
-
-  if (hash) {
-    const chatExists = store.chats.some(chat => chat.id === hash);
-    if (chatExists) {
-      selectChat(hash);
-      return;
-    }
+  if (hash && chat.chats.some(chat => chat.id === hash)) {
+    selectChat(hash);
+    return;
   }
 
-  if (store.chats.length > 0) {
-    selectChat(store.chats[0].id);
+  if (chat.chats.length > 0) {
+    selectChat(chat.chats[0].id);
   }
-});
+};
+
+onMounted(initializeChat);
 </script>
 
 <template>
-  <div :class="['sidebar', {'sidebar--opened': store.isAsideOpen, 'sidebar-chat': isChatPage}]">
+  <div :class="['sidebar', { 'sidebar--opened': app.isAsideOpen, 'sidebar-chat': isChatPage }]">
     <div class="sidebar__collapsed-item">
-      <v-btn :icon="store.isAsideOpen ? 'mdi-backburger' : 'mdi-menu'" @click="store.setAside(!store.isAsideOpen)" />
-      <Logo v-show="store.isAsideOpen" class="sidebar__logo" />
+      <v-btn
+        :icon="app.isAsideOpen ? 'mdi-backburger' : 'mdi-menu'"
+        @click="app.setAside(!app.isAsideOpen)"
+      />
+      <Logo v-show="app.isAsideOpen" class="sidebar__logo" />
       <v-btn class="new-chat-btn" icon="mdi-autorenew" @click="onNewChat" />
     </div>
     <template v-if="isChatPage">
       <v-autocomplete
+        v-model="selectedModel"
+        :items="modelNames"
         class="models-autocomplete"
         label="Модель"
-        :items="modelNames"
-        v-model="selectedModel"
         variant="solo-inverted"
       ></v-autocomplete>
       <a
         v-if="isChangedModel"
         class="select-model-as-default"
         @click="setDefaultModel"
-      >Установить по умолчанию</a>
+      >
+        Установить по умолчанию
+      </a>
     </template>
 
     <transition name="fade">
-      <div class="chat-list" v-if="store.isAsideOpen && isChatPage">
+      <div v-if="app.isAsideOpen && isChatPage" class="chat-list">
         <div
-          v-for="chat in store.chats" :key="chat.id"
-          :class="['chat-item', {'chat-item--selected': store.activeChatId === chat.id}]"
-          @click="selectChat(chat.id)"
+          v-for="_chat in chat.chats"
+          :key="_chat.id"
+          :class="['chat-item', { 'chat-item--selected': chat.activeChatId === _chat.id }]"
+          @click="selectChat(_chat.id)"
         >
-          <span>
-            {{ chat.title }}
-          </span>
-          <v-btn icon="mdi-delete" size="small" @click.stop="deleteChat(chat.id)" />
+          <span>{{ _chat.title }}</span>
+          <v-btn icon="mdi-delete" size="small" @click.stop="deleteChat(_chat.id)" />
         </div>
       </div>
     </transition>
 
-    <v-btn class="settings-btn" icon="mdi-wrench" :color="!isChatPage ? 'blue' : ''" @click="toggleSettings" />
+    <v-btn
+      :color="!isChatPage ? 'blue' : ''"
+      class="settings-btn"
+      icon="mdi-wrench"
+      @click="toggleSettings"
+    />
   </div>
 </template>
 
@@ -200,16 +180,16 @@ onMounted(() => {
   position: relative;
   transform: none;
   top: 0;
-  left: 0;
+  transition: .4s;
+}
+
+.sidebar__collapsed-item {
+  flex-direction: row;
+  justify-content: space-between;
+  width: 100%;
 }
 
 .sidebar.sidebar--opened {
-  .sidebar__collapsed-item {
-    flex-direction: row;
-    justify-content: space-between;
-    width: 100%;
-  }
-
   .new-chat-btn {
     right: var(--padding-body);
     transform: translateX(0);
@@ -244,12 +224,16 @@ onMounted(() => {
   width: 330px;
 
   &--selected {
-    background-color: rgba(var(--v-theme-background) / 60%);
+    background-color: rgba(var(--v-theme-background) / 80%);
     transition: .2s;
   }
 
   &:hover {
-    background-color: rgba(var(--v-theme-background) / 40%) !important;
+    background-color: rgba(var(--v-theme-background) / 80%) !important;
+  }
+
+  &:not(.chat-item--selected):hover {
+    background-color: rgba(var(--v-theme-background) / 60%) !important;
   }
 }
 

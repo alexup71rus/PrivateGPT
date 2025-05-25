@@ -1,9 +1,10 @@
-import type { HttpModule } from '@/services/http'
-import type { Ref } from 'vue'
+import type {HttpModule} from '@/services/http'
+import type {Ref} from 'vue'
+import type {InternalAxiosRequestConfig} from "axios";
 
 export function createAuthModule(isAuthRequired: Ref<boolean>): HttpModule {
   return {
-    onRequest(config) {
+    onRequest(config: InternalAxiosRequestConfig) {
       if ((config as any).skipAuth) return config
 
       const token = localStorage.getItem('token')

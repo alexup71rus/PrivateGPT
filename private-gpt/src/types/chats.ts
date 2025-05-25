@@ -1,5 +1,9 @@
 export type MemoryEntry = { text: string; timestamp: number };
 
+export interface ChatModel {
+  name: string;
+}
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant';

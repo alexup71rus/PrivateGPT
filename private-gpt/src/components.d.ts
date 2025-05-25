@@ -9,17 +9,7 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     AlertProvider: typeof import('./components/Providers/AlertProvider.vue')['default']
-    AppFooter: typeof import('./components/Outline/AppFooter.vue')['default']
-    AppHeader: typeof import('./components/Outline/AppHeader.vue')['default']
-    AsideMenu: typeof import('./components/Outline/AsideMenu.vue')['default']
-    Chat: typeof import('./components/Pages/Chat/Chat.vue')['default']
-    Chats: typeof import('./components/Chats.vue')['default']
-    ChatsLayout: typeof import('./components/ChatsLayout.vue')['default']
-    ChatsList: typeof import('./components/Outline/ChatsList.vue')['default']
     General: typeof import('./components/Pages/Settings/General.vue')['default']
-    Header: typeof import('./components/Outline/Header.vue')['default']
-    Index: typeof import('./components/Pages/Chat/Index.vue')['default']
-    Message: typeof import('./components/Pages/Chat/Message.vue')['default']
     MessageBox: typeof import('./components/Pages/Chat/MessageBox.vue')['default']
     MessageBubble: typeof import('./components/Pages/Chat/MessageBubble.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']

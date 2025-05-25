@@ -1,19 +1,18 @@
-<script setup lang="ts">
-import {ref, computed, watch, onBeforeUnmount, onMounted, nextTick} from "vue";
-import { useChatStore } from "@/stores/chat.ts";
+<script lang="ts" setup>
+import {computed, nextTick, onMounted, ref} from "vue";
+import {useChatStore} from "@/stores/chat.ts";
+import {useAppSettings} from "@/composables/useAppSettings.ts";
 
-const store = useChatStore();
-const textareaRef = ref();
+const chat = useChatStore();
+const { settings } = useAppSettings();
+const textareaRef = ref<HTMLInputElement>();
+const fileInputRef = ref<HTMLInputElement>();
+const activeChat = computed(() => chat.activeChat);
+const activeChatId = computed(() => chat.activeChatId);
 const messageText = ref('');
 const attachment = ref<File | null>(null);
-const fileInputRef = ref<HTMLInputElement | null>(null);
-const isSearch = ref(false);
-
-onBeforeUnmount(() => {
-  if (attachment.value) {
-    URL.revokeObjectURL(URL.createObjectURL(attachment.value));
-  }
-});
+const isSearch = ref(settings.isSearchAsDefault);
+const canSend = computed(() => messageText.value.trim() && !chat.isSending);
 
 function handleAttachClick() {
   fileInputRef.value?.click();
@@ -31,33 +30,33 @@ function removeAttachment() {
   attachment.value = null;
 }
 
-async function sendMessage(event: Event) {
+function onFormSubmit(event: Event) {
   event.preventDefault();
-  if (!messageText.value.trim() || !store.activeChatId || store.isSending) return;
+  sendMessage();
+}
 
-  store.setIsSending(true);
+async function sendMessage() {
+  if (!canSend.value) return;
 
+  chat.setIsSending(true);
   try {
-    await store.sendMessage(store.activeChatId, messageText.value);
+    await chat.sendMessage(activeChatId.value, messageText.value);
     messageText.value = '';
     attachment.value = null;
-
-    setTimeout(() => {
-      textareaRef.value?.focus();
-    }, 0);
+    textareaRef.value?.focus();
   } finally {
-    store.setIsSending(false);
+    chat.setIsSending(false);
   }
 }
 
 function stopGeneration() {
-  if (store.abortController) {
-    store.abortController.abort();
-    store.setIsSending(false);
+  if (chat.abortController) {
+    chat.abortController.abort();
+    chat.setIsSending(false);
 
-    const lastMessage = store.activeChat?.messages[store.activeChat.messages.length - 1];
+    const lastMessage = activeChat.value?.messages[activeChat.value.messages.length - 1];
     if (lastMessage?.isLoading) {
-      store.updateMessage(store.activeChatId, lastMessage.id, lastMessage.content, false);
+      chat.updateMessage(activeChatId.value, lastMessage.id, lastMessage.content, false);
     }
   }
 }
@@ -71,8 +70,8 @@ onMounted(() => {
   <div class="chat-input-wrapper">
     <input
       ref="fileInputRef"
-      type="file"
       hidden
+      type="file"
       @change="handleFilesSelected"
     />
 
@@ -80,25 +79,25 @@ onMounted(() => {
       <v-textarea
         ref="textareaRef"
         v-model="messageText"
-        class="chat-input"
-        placeholder="Введите сообщение..."
+        :disabled="chat.isSending"
         auto-grow
-        rows="1"
-        hide-details
-        variant="solo-filled"
+        class="chat-input"
         density="comfortable"
-        :disabled="store.isSending"
+        hide-details
+        placeholder="Введите сообщение..."
+        rows="1"
+        variant="solo-filled"
         @keydown.enter.exact.prevent.stop
-        @keyup.enter.exact.prevent.stop="sendMessage"
+        @keyup.enter.exact.prevent.stop="onFormSubmit"
       />
     </div>
 
     <div class="chat-input-actions">
       <v-btn
-        variant="tonal"
-        class="file-btn"
-        :disabled="store.isSending"
         :color="attachment ? 'blue' : 'white'"
+        :disabled="chat.isSending"
+        class="file-btn"
+        variant="tonal"
         @click="handleAttachClick"
       >
         <template #prepend>
@@ -116,30 +115,30 @@ onMounted(() => {
       </v-btn>
 
       <v-btn
+        :color="isSearch ? 'blue' : 'white'"
+        :disabled="chat.isSending"
+        class="search-btn"
         prepend-icon="mdi-magnify"
         variant="tonal"
-        class="search-btn"
-        :disabled="store.isSending"
-        :color="isSearch ? 'blue' : 'white'"
         @click="isSearch = !isSearch"
       >
         Поиск
       </v-btn>
       <v-spacer />
       <v-btn
-        :icon="store.isSending ? 'mdi-stop' : 'mdi-send'"
+        :color="chat.isSending ? 'error' : undefined"
+        :disabled="!canSend"
+        :icon="chat.isSending ? 'mdi-stop' : 'mdi-send'"
+        class="send-btn"
         size="small"
         variant="text"
-        class="send-btn"
-        :disabled="!messageText.trim() && !store.isSending"
-        :color="store.isSending ? 'error' : undefined"
-        @click="store.isSending ? stopGeneration() : sendMessage($event)"
+        @click="chat.isSending ? stopGeneration() : onFormSubmit($event)"
       />
     </div>
   </div>
 </template>
 
-<style scoped lang="scss">
+<style lang="scss" scoped>
 .chat-input-wrapper {
   padding: var(--padding-body);
   background-color: rgb(var(--v-theme-surface));
@@ -153,6 +152,7 @@ onMounted(() => {
 
 .chat-input-container {
   ::v-deep(.v-field) {
+    --v-shadow-key-umbra-opacity: 0;
     border-radius: 20px;
   }
 }
