@@ -7,7 +7,7 @@ const chat = useChatStore();
 const chatTitle = ref(chat.activeChat?.title ?? '');
 const messages = computed(() => chat.activeChat?.messages ?? []);
 const { chatMessagesRef } = useChatScroll(messages);
-const isLoading = computed(() => chat.activeChat?.messages[chat.activeChat.messages.length - 1]?.role === 'user');
+const isLoading = computed(() => chat.activeChat?.messages[chat.activeChat.messages.length - 1]?.role === 'user' && chat.isSending);
 
 watch(() => chatTitle.value || '', (newTitle: string) => {
   chat.renameChat(chat.activeChatId, newTitle);
@@ -25,21 +25,30 @@ watch(() => chat.activeChat?.title || '', (newTitle: string) => {
 
     </div>
 
-    <div v-if="chat.activeChat" ref="chatMessagesRef" class="chat-messages">
-      <div
-        v-for="message in chat.activeChat?.messages"
-        :key="message.id"
-        class="message-wrapper"
-      >
-        <MessageBubble :message="message" />
-      </div>
+    <div ref="chatMessagesRef" class="chat-messages">
+      <template v-if="chat.activeChat?.messages?.length">
+        <div
+          v-for="message in chat.activeChat?.messages"
+          :key="message.id"
+          class="message-wrapper"
+        >
+          <MessageBubble :message="message" />
+        </div>
 
-      <div v-if="isLoading" class="loader">
-        <v-progress-circular
-          color="primary"
-          indeterminate
-        ></v-progress-circular>
-      </div>
+        <div v-if="isLoading" class="loader">
+          <v-progress-circular
+            color="primary"
+            indeterminate
+          ></v-progress-circular>
+        </div>
+      </template>
+      <template v-else>
+        <div class="chat-logo">
+          <img alt="Chat logo" src="@/assets/logo.svg">
+          <hr>
+          <h2>PrivateGPT</h2>
+        </div>
+      </template>
     </div>
 
     <MessageBox class="message-box" />
@@ -57,6 +66,16 @@ watch(() => chat.activeChat?.title || '', (newTitle: string) => {
   width: 100%;
   height: 100%;
   padding: 7px 16px 16px;
+
+  .chat-logo {
+    filter: grayscale(1);
+    opacity: .3;
+    width: 100%;
+    max-width: 200px;
+    margin: auto auto;
+    text-align: center;
+    font-size: 18px;
+  }
 
   .chat-title {
     margin-left: auto;

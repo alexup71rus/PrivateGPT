@@ -13,7 +13,7 @@ const messageText = ref('');
 const attachment = ref<File | null>(null);
 const attachmentContent = ref<{ content: string, type: 'text' | 'image', meta: File } | null>(null);
 const isSearch = ref(settings.isSearchAsDefault);
-const canSend = computed(() => messageText.value.trim() && !chat.isSending);
+const canSend = computed(() => chat.isSending ? false : messageText.value.trim());
 
 function handleAttachClick() {
   fileInputRef.value?.click();
@@ -83,6 +83,7 @@ function stopGeneration() {
     const lastMessage = activeChat.value?.messages[activeChat.value.messages.length - 1];
     if (lastMessage?.isLoading) {
       chat.updateMessage(activeChatId.value, lastMessage.id, lastMessage.content, false);
+      chat.setIsSending(false);
     }
   }
 }
@@ -153,7 +154,7 @@ onMounted(() => {
       <v-spacer />
       <v-btn
         :color="chat.isSending ? 'error' : undefined"
-        :disabled="!canSend"
+        :disabled="chat.isSending ? false : !canSend"
         :icon="chat.isSending ? 'mdi-stop' : 'mdi-send'"
         class="send-btn"
         size="small"

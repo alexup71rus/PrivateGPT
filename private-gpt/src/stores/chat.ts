@@ -29,7 +29,6 @@ export const useChatStore = defineStore('chat', {
   },
   getters: {
     activeChat(state): Chat | undefined {
-      console.log(state.activeChatId)
       return state.chats.find(chat => chat.id === state.activeChatId);
     },
     selectedModel(): string {
@@ -38,7 +37,7 @@ export const useChatStore = defineStore('chat', {
   },
   actions: {
     async initialize() {
-      this.chats = await loadChats();
+      this.chats = await loadChats().then(res => res.reverse());
       this.memory = await loadMemory();
 
       if (this.chats.length === 0) {
@@ -333,7 +332,12 @@ ${metaInfo}
       }
     },
 
-    async editMessage(chatId: string, messageId: string, newContent: string, dropFollowing = false) {
+    async editMessage(
+      chatId: string,
+      messageId: string,
+      newContent: string,
+      dropFollowing: boolean = false,
+    ): Promise<void> {
       const chat = this.getChat(chatId);
       if (!chat) return;
 
@@ -356,7 +360,7 @@ ${metaInfo}
 
       const index = chat.messages.findIndex(m => m.id === messageId);
       if (index !== -1) {
-        chat.messages.splice(index, 1);
+        chat.messages = chat.messages.slice(0, index);
         await this.persistChat(chatId);
       }
     },

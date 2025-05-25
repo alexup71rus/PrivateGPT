@@ -4,7 +4,6 @@ import {computed, onMounted, ref} from "vue";
 import {useAppSettings} from "@/composables/useAppSettings.ts";
 import {useRouter} from "vue-router";
 import {useChatActions} from "@/composables/useChatActions.ts";
-import Logo from "@/assets/logo.svg";
 import type {ChatModel} from "@/types/chats.ts";
 import {useAppStore} from "@/stores/app.ts";
 
@@ -67,7 +66,7 @@ onMounted(initializeChat);
         :icon="app.isAsideOpen ? 'mdi-backburger' : 'mdi-menu'"
         @click="app.setAside(!app.isAsideOpen)"
       />
-      <Logo v-show="app.isAsideOpen" class="sidebar__logo" />
+      <img v-show="app.isAsideOpen" alt="Chat logo" class="sidebar__logo" src="@/assets/logo.svg">
       <v-btn class="new-chat-btn" icon="mdi-autorenew" @click="onNewChat" />
     </div>
     <template v-if="isChatPage">

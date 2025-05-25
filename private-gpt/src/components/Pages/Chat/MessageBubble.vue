@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import type {Message} from "@/types/chats.ts";
+import type {Attachment, Message} from "@/types/chats.ts";
 import {useChatStore} from "@/stores/chat.ts";
 import {useAlert} from "@/plugins/alertPlugin.ts";
 import {computed, onMounted, ref} from "vue";
@@ -52,13 +52,60 @@ const openEditDialog = () => {
   isEditDialogOpen.value = true;
 };
 
-const saveEditedMessage = () => {
-  if (editedContent.value.trim()) {
-    chat.editMessage(chat.activeChatId, props.message.id, editedContent.value);
-    showSnackbar({ message: "Сообщение обновлено", type: "success" });
-  } else {
+const saveEditedMessage = async (makeResend = false) => {
+  if (!editedContent.value.trim()) {
     showSnackbar({ message: "Текст не может быть пустым", type: "warning" });
+    return;
   }
+
+  // Сохраняем изменения
+  await chat.editMessage(chat.activeChatId, props.message.id, editedContent.value);
+  showSnackbar({ message: "Сообщение обновлено", type: "success" });
+
+  if (!makeResend) {
+    isEditDialogOpen.value = false;
+    return;
+  }
+
+  const _chat = chat.activeChat;
+  if (!_chat) return;
+
+  const index = _chat.messages.findIndex((m) => m.id === props.message.id);
+  if (index < 0) return;
+
+  _chat.messages = _chat.messages.slice(0, index);
+  await chat.persistChat(_chat.id);
+
+  chat.setIsSending(true);
+
+  if (props.message.role === 'user') {
+    await chat.sendMessage(
+      chat.activeChatId,
+      editedContent.value,
+      props.message.attachmentContent ? {
+        content: props.message.attachmentContent,
+        type: props.message.attachmentMeta?.type || 'text',
+        meta: props.message.attachmentMeta
+      } as Attachment : null
+    );
+  } else {
+    if (index === 0) return;
+
+    const prevMessage = _chat.messages[index - 1];
+    if (prevMessage.role !== 'user') return;
+
+    await chat.sendMessage(
+      chat.activeChatId,
+      prevMessage.content,
+      prevMessage.attachmentContent ? {
+        content: prevMessage.attachmentContent,
+        type: prevMessage.attachmentMeta?.type || 'text',
+        meta: prevMessage.attachmentMeta
+      } as Attachment : null
+    );
+  }
+
+  chat.setIsSending(false);
   isEditDialogOpen.value = false;
 };
 
@@ -176,7 +223,8 @@ const saveSummary = async () => {
       </v-card-text>
       <v-card-actions>
         <v-spacer />
-        <v-btn color="primary" text @click="saveEditedMessage">Сохранить</v-btn>
+        <v-btn v-if="message.role === 'user'" color="primary" text @click="saveEditedMessage(true)">Сохранить и отправить</v-btn>
+        <v-btn color="primary" text @click="saveEditedMessage()">Сохранить</v-btn>
         <v-btn text @click="closeEditDialog">Закрыть</v-btn>
       </v-card-actions>
     </v-card>
