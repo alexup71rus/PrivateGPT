@@ -6,7 +6,7 @@
   --header-height: 64px;
 }
 
-body .v-theme--light {
+:root .v-theme--light {
   --v-theme-surface: 255 255 255;
   --v-theme-surface-rgba: 255, 255, 255;
   --v-theme-background: 245 245 245;
@@ -17,7 +17,7 @@ body .v-theme--light {
   --v-theme-on-surface: 66 66 66;
 }
 
-body .v-theme--dark {
+:root .v-theme--dark {
   --v-theme-surface: 37 38 44;
   --v-theme-surface-rgba: 37, 38, 44;
   --v-theme-background: 26 27 32;

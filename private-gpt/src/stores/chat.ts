@@ -1,7 +1,7 @@
 import {defineStore} from 'pinia';
 import {useHttpService} from '@/plugins/httpPlugin';
 import type {OllamaModel, OllamaTagsResponse} from '@/types/ollama.ts';
-import type {Chat, Message} from '@/types/chats.ts';
+import type {AttachmentMeta, Chat, Message} from '@/types/chats.ts';
 import {throttle} from '@/utils/helpers.ts';
 import {useAppSettings} from '@/composables/useAppSettings.ts';
 import type {ISettings} from '@/types/settings.ts';
@@ -95,10 +95,23 @@ export const useChatStore = defineStore('chat', {
       }
     },
 
-    addMessage(chatId: string, message: Omit<Message, 'id'>) {
+    addMessage(chatId: string, message: Omit<Message, 'id'>, attachment?: { content: string, type: 'text' | 'image', meta: File }) {
       const chat = this.getChat(chatId);
       if (chat) {
-        const newMessage = { ...message, id: crypto.randomUUID() };
+        const newMessage = {
+          ...message,
+          id: crypto.randomUUID(),
+          ...(attachment && {
+            attachmentMeta: {
+              type: attachment.type,
+              name: attachment.meta.name,
+              size: attachment.meta.size,
+              lastModified: attachment.meta.lastModified,
+            } as AttachmentMeta,
+            attachmentContent: attachment.content,
+          }),
+        };
+
         chat.messages.push(newMessage);
         return newMessage.id;
       }
@@ -154,7 +167,7 @@ export const useChatStore = defineStore('chat', {
       }
     },
 
-    async sendMessage(chatId: string, content: string) {
+    async sendMessage(chatId: string, content: string, attachmentContent: { content: string, type: 'text' | 'image', meta: File } | null = null) {
       try {
         const chat = this.activeChat;
         if (!chat) throw new Error('No active chat');
@@ -163,58 +176,134 @@ export const useChatStore = defineStore('chat', {
         this.abortController?.abort();
         this.abortController = new AbortController();
 
-        const userMessageId = this.addMessage(chatId, { role: 'user', content });
+        let finalContent = content;
+        let images: string[] | undefined;
+        let userMessageId: string | null;
+
+        if (attachmentContent) {
+          const file = attachmentContent.meta;
+          const metaInfo = `[Attached: ${file.name}, ${file.size} bytes, modified ${new Date(file.lastModified).toLocaleDateString()}]`;
+
+          if (attachmentContent.meta.type !== 'text' && attachmentContent.meta.type !== 'image') {
+            if (attachmentContent.type === 'image') {
+              images = [attachmentContent.content];
+              finalContent = `<hidden>${metaInfo}</hidden>${finalContent}`;
+            } else if (attachmentContent.type === 'text') {
+              finalContent = `<hidden>
+${attachmentContent.content}
+${metaInfo}
+</hidden>${content}`;
+            }
+          }
+
+          userMessageId = this.addMessage(chatId, { role: 'user', content: finalContent }, attachmentContent);
+        } else {
+          userMessageId = this.addMessage(chatId, { role: 'user', content: finalContent });
+        }
+
         if (!userMessageId) return;
 
-        const response = await fetch(`${this.settings.ollamaLink}/api/chat`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+        if (images) {
+          const body = {
             model: this.selectedModel,
-            messages: chat.messages.map(msg => ({ role: msg.role, content: msg.content })),
-            stream: true,
-          }),
-          signal: this.abortController.signal,
-        });
+            prompt: finalContent,
+            images,
+            stream: true, // Включаем стриминг для /api/generate
+          };
 
-        if (!response.body) throw new Error('No response body');
+          const response = await fetch(`${this.settings.ollamaLink}/api/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            signal: this.abortController.signal,
+          });
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let assistantContent = '';
-        let assistantMessageId: string | null = null;
+          if (!response.body) throw new Error('No response body');
 
-        while (true) {
-          const { done, value } = await reader.read();
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let assistantContent = '';
+          let assistantMessageId: string | null = null;
 
-          if (done) {
-            if (assistantMessageId) {
-              const message = this.getMessage(chatId, assistantMessageId);
-              if (message) this.updateMessage(chatId, assistantMessageId, message.content, false);
-            }
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
 
-            if (this.activeChat && this.shouldGenerateTitle(this.activeChat)) {
-              await this.generateChatTitle(chatId);
-            }
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n').filter(line => line.trim());
 
-            break;
-          }
-
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split('\n').filter(line => line.trim());
-
-          for (const line of lines) {
-            try {
-              const data = JSON.parse(line);
-              if (data.message?.role === 'assistant' && data.message.content) {
-                assistantMessageId ??= this.addMessage(chatId, { role: 'assistant', content: '', isLoading: true });
-                assistantContent += data.message.content;
-                this.updateMessage(chatId, assistantMessageId!, assistantContent);
+            for (const line of lines) {
+              try {
+                const data = JSON.parse(line);
+                if (data.response) {
+                  assistantMessageId ??= this.addMessage(chatId, { role: 'assistant', content: '', isLoading: true });
+                  assistantContent += data.response;
+                  this.updateMessage(chatId, assistantMessageId!, assistantContent);
+                }
+              } catch (e) {
+                console.error('Error parsing chunk:', e);
               }
-            } catch (e) {
-              console.error('Error parsing chunk:', e);
             }
           }
+
+          if (assistantMessageId) {
+            const message = this.getMessage(chatId, assistantMessageId);
+            if (message) this.updateMessage(chatId, assistantMessageId, message.content, false);
+          }
+        } else {
+          const body = {
+            model: this.selectedModel,
+            messages: chat.messages.map(msg => ({
+              role: msg.role,
+              content: msg.content,
+              ...(msg.attachmentContent && msg.attachmentMeta?.type === 'image' ? { images: [msg.attachmentContent] } : {})
+            })),
+            stream: true,
+          };
+
+          const response = await fetch(`${this.settings.ollamaLink}/api/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            signal: this.abortController.signal,
+          });
+
+          if (!response.body) throw new Error('No response body');
+
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let assistantContent = '';
+          let assistantMessageId: string | null = null;
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n').filter(line => line.trim());
+
+            for (const line of lines) {
+              try {
+                const data = JSON.parse(line);
+                if (data.message?.role === 'assistant' && data.message.content) {
+                  assistantMessageId ??= this.addMessage(chatId, { role: 'assistant', content: '', isLoading: true });
+                  assistantContent += data.message.content;
+                  this.updateMessage(chatId, assistantMessageId!, assistantContent);
+                }
+              } catch (e) {
+                console.error('Error parsing chunk:', e);
+              }
+            }
+          }
+
+          if (assistantMessageId) {
+            const message = this.getMessage(chatId, assistantMessageId);
+            if (message) this.updateMessage(chatId, assistantMessageId, message.content, false);
+          }
+        }
+
+        if (this.activeChat && this.shouldGenerateTitle(this.activeChat)) {
+          await this.generateChatTitle(chatId);
         }
 
         this.persistChats();
@@ -268,7 +357,11 @@ export const useChatStore = defineStore('chat', {
       chat.messages = chat.messages.slice(0, index - 1);
       this.persistChats();
 
-      await this.sendMessage(chatId, prevMessage.content);
+      await this.sendMessage(chatId, prevMessage.content, prevMessage.attachmentContent ? {
+        content: prevMessage.attachmentContent,
+        type: prevMessage.attachmentMeta?.type || 'text',
+        meta: prevMessage.attachmentMeta as File
+      } : null);
     },
 
     async saveSummary(chatId: string, messageId: string) {

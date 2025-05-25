@@ -17,6 +17,13 @@ const bubbleRef = ref();
 const isEditDialogOpen = ref(false);
 const editedContent = ref("");
 
+const formatFileSize = computed(() => (size: number | undefined) => {
+  if (!size) return '';
+  if (size < 1024) return `${size} Б`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} КБ`;
+  return `${(size / 1024 / 1024).toFixed(2)} МБ`;
+});
+
 useCopyCode(bubbleRef, showSnackbar);
 
 const parsedContent = computed(() => {
@@ -24,6 +31,7 @@ const parsedContent = computed(() => {
 });
 
 const copyMessage = async () => {
+  console.log(props.message)
   await navigator.clipboard.writeText(props.message.content);
   showSnackbar({
     message: 'Скопировано!',
@@ -115,6 +123,12 @@ const saveSummary = async () => {
 
 <template>
   <div ref="bubbleRef" :class="message.role" class="message-bubble">
+    <v-chip
+      v-if="message.attachmentMeta"
+      :prepend-icon="message.attachmentMeta?.type === 'text' ? 'mdi-file-document' : 'mdi-file-image'"
+    >
+      {{ message.attachmentMeta.name }} [{{ formatFileSize(message.attachmentMeta.size) }}]
+    </v-chip>
     <div class="content" v-html="parsedContent" />
     <div v-if="false" class="attachments-scroll">
       <div class="attachment" />
@@ -210,6 +224,10 @@ const saveSummary = async () => {
       border-radius: 6px;
       background: rgba(0, 0, 0, 0.05);
     }
+  }
+
+  ::v-deep(hidden) {
+    display: none;
   }
 }
 

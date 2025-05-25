@@ -11,6 +11,7 @@ const activeChat = computed(() => chat.activeChat);
 const activeChatId = computed(() => chat.activeChatId);
 const messageText = ref('');
 const attachment = ref<File | null>(null);
+const attachmentContent = ref<{ content: string, type: 'text' | 'image', meta: File } | null>(null);
 const isSearch = ref(settings.isSearchAsDefault);
 const canSend = computed(() => messageText.value.trim() && !chat.isSending);
 
@@ -20,14 +21,38 @@ function handleAttachClick() {
 
 function handleFilesSelected(event: Event) {
   const input = event.target as HTMLInputElement;
-  if (input.files && input.files.length > 0) {
-    attachment.value = input.files[0];
-    input.value = '';
+  const file = input.files?.[0];
+
+  if (!file) return;
+
+  const isImage = /\.(png|jpe?g)$/i.test(file.name);
+  const reader = new FileReader();
+
+  reader.onload = () => {
+    const result = reader.result as string;
+
+    if (isImage) {
+      const base64 = result.split(',')[1];
+      attachmentContent.value = { content: base64, type: 'image', meta: file };
+    } else {
+      attachmentContent.value = { content: result, type: 'text', meta: file };
+    }
+
+    attachment.value = file;
+  };
+
+  if (isImage) {
+    reader.readAsDataURL(file);
+  } else {
+    reader.readAsText(file);
   }
+
+  input.value = '';
 }
 
 function removeAttachment() {
   attachment.value = null;
+  attachmentContent.value = null;
 }
 
 function onFormSubmit(event: Event) {
@@ -40,9 +65,10 @@ async function sendMessage() {
 
   chat.setIsSending(true);
   try {
-    await chat.sendMessage(activeChatId.value, messageText.value);
+    await chat.sendMessage(activeChatId.value, messageText.value, attachmentContent.value);
     messageText.value = '';
     attachment.value = null;
+    attachmentContent.value = null;
     textareaRef.value?.focus();
   } finally {
     chat.setIsSending(false);
