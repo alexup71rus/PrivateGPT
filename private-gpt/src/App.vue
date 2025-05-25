@@ -1,17 +1,25 @@
 <script lang="ts" setup>
 import AlertProvider from "@/components/Providers/AlertProvider.vue";
 import {useChatStore} from "@/stores/chat.ts";
-import {onMounted} from "vue";
+import {onMounted, watch} from "vue";
 import {useAppRouting} from "@/composables/useAppRouting.ts";
 import {useAppStore} from "@/stores/app.ts";
+import {useChatActions} from "@/composables/useChatActions.ts";
+import {useRoute} from "vue-router";
 
 const app = useAppStore();
 const chat = useChatStore();
+const route = useRoute();
+const { selectChat } = useChatActions();
 const { isChatPage } = useAppRouting();
 
 onMounted(async () => {
   await chat.fetchModels();
-  chat.initialize();
+  await chat.initialize();
+});
+
+watch(() => route.hash, async (newHash) => {
+  await selectChat(newHash.replace('#', ''));
 });
 </script>
 

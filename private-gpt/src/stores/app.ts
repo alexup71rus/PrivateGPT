@@ -2,7 +2,6 @@ import {defineStore} from 'pinia';
 import {useHttpService} from "@/plugins/httpPlugin";
 import {useAppSettings} from "@/composables/useAppSettings.ts";
 import type {ISettings} from "@/types/settings.ts";
-import {loadChats} from "@/utils/storage.ts";
 
 export const useAppStore = defineStore('app', {
   state: () => {
@@ -13,7 +12,6 @@ export const useAppStore = defineStore('app', {
       http,
       settings: settings as ISettings,
       isAsideOpen: false,
-      chats: loadChats(),
     };
   },
   getters: {

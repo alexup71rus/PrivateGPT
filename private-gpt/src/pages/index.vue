@@ -21,7 +21,7 @@ watch(() => chat.activeChat?.title || '', (newTitle: string) => {
 <template>
   <div class="chat-page">
     <div class="chat-title">
-      <v-text-field v-model="chatTitle" label="Заголовок чата" variant="solo"></v-text-field>
+      <v-text-field v-model="chatTitle" :disabled="!chat.activeChat?.id" label="Заголовок чата" variant="solo"></v-text-field>
 
     </div>
 

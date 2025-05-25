@@ -1,9 +1,20 @@
-import { computed } from 'vue';
-import { useRoute } from 'vue-router';
+import {computed} from 'vue';
+import {useRoute, useRouter} from 'vue-router';
 
 export function useAppRouting() {
   const route = useRoute();
-  const isChatPage = computed(() => route.name === '/');
+  const router = useRouter();
 
-  return { isChatPage };
+  const currentChatId = computed(() => route.hash.replace('#', ''));
+  const isChatPage = computed(() => route.name === '/' || route.path === '/');
+
+  const navigateWithHash = (chatId: string) => {
+    return router.push({ path: '/', hash: `#${chatId}` });
+  };
+
+  return {
+    isChatPage,
+    currentChatId,
+    navigateWithHash
+  };
 }

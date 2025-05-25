@@ -1,15 +1,15 @@
 import {defineStore} from 'pinia';
 import {useHttpService} from '@/plugins/httpPlugin';
 import type {OllamaModel, OllamaTagsResponse} from '@/types/ollama.ts';
-import type {AttachmentMeta, Chat, Message} from '@/types/chats.ts';
+import type {Attachment, AttachmentMeta, Chat, MemoryEntry, Message} from '@/types/chats.ts';
 import {throttle} from '@/utils/helpers.ts';
 import {useAppSettings} from '@/composables/useAppSettings.ts';
 import type {ISettings} from '@/types/settings.ts';
-import {loadChats, loadMemory} from '@/utils/storage.ts';
+import {deleteChat, loadChats, loadMemory, saveChat, saveMemory} from '@/utils/storage.ts';
 
-const throttledPersist = throttle((chats: Chat[]) => {
-  localStorage.setItem('privateGPTChats', JSON.stringify(chats));
-}, 1000);
+const throttledSaveChat = throttle(async (chat: Chat) => {
+  await saveChat(chat);
+}, 500);
 
 export const useChatStore = defineStore('chat', {
   state: () => {
@@ -20,8 +20,8 @@ export const useChatStore = defineStore('chat', {
       http,
       settings: settings as ISettings,
       models: [] as OllamaModel[],
-      memory: loadMemory(),
-      chats: loadChats(),
+      memory: [] as MemoryEntry[],
+      chats: [] as Chat[],
       activeChatId: '',
       isSending: false,
       abortController: null as AbortController | null,
@@ -29,6 +29,7 @@ export const useChatStore = defineStore('chat', {
   },
   getters: {
     activeChat(state): Chat | undefined {
+      console.log(state.activeChatId)
       return state.chats.find(chat => chat.id === state.activeChatId);
     },
     selectedModel(): string {
@@ -36,8 +37,24 @@ export const useChatStore = defineStore('chat', {
     },
   },
   actions: {
-    persistChats() {
-      throttledPersist(this.chats);
+    async initialize() {
+      this.chats = await loadChats();
+      this.memory = await loadMemory();
+
+      if (this.chats.length === 0) {
+        await this.createChat();
+      }
+    },
+
+    async persistChat(chatId: string) {
+      try {
+        const chat = this.getChat(chatId);
+        if (chat) {
+          await throttledSaveChat(chat);
+        }
+      } catch (error) {
+        console.error('Failed to persist chat:', error);
+      }
     },
 
     getChat(chatId: string): Chat | undefined {
@@ -56,13 +73,7 @@ export const useChatStore = defineStore('chat', {
       this.isSending = value;
     },
 
-    initialize() {
-      if (this.chats.length === 0) {
-        this.createChat();
-      }
-    },
-
-    createChat() {
+    async createChat() {
       const newChat: Chat = {
         id: crypto.randomUUID(),
         title: 'Новый чат',
@@ -71,32 +82,34 @@ export const useChatStore = defineStore('chat', {
 
       this.chats.unshift(newChat);
       this.activeChatId = newChat.id;
-      this.persistChats();
+      await this.persistChat(newChat.id);
 
       return newChat;
     },
 
-    deleteChat(chatId: string) {
+    async deleteChat(chatId: string) {
       const index = this.chats.findIndex(chat => chat.id === chatId);
       if (index !== -1) {
         this.chats.splice(index, 1);
+        await deleteChat(chatId);
+
         if (this.activeChatId === chatId) {
-          this.activeChatId = this.chats[0]?.id || this.createChat()?.id || '';
+          this.activeChatId = this.chats[0]?.id || (await this.createChat())?.id || '';
         }
-        this.persistChats();
       }
     },
 
-    renameChat(chatId: string, newTitle: string) {
+    async renameChat(chatId: string, newTitle: string) {
       const chat = this.getChat(chatId);
       if (chat) {
         chat.title = newTitle;
-        this.persistChats();
+        await this.persistChat(chatId);
       }
     },
 
-    addMessage(chatId: string, message: Omit<Message, 'id'>, attachment?: { content: string, type: 'text' | 'image', meta: File }) {
+    async addMessage(chatId: string, message: Omit<Message, 'id'>, attachment?: { content: string, type: 'text' | 'image', meta: File }) {
       const chat = this.getChat(chatId);
+
       if (chat) {
         const newMessage = {
           ...message,
@@ -113,12 +126,15 @@ export const useChatStore = defineStore('chat', {
         };
 
         chat.messages.push(newMessage);
+        await this.persistChat(chatId);
+
         return newMessage.id;
       }
+
       return null;
     },
 
-    updateMessage(chatId: string, messageId: string, content: string, isLoading?: boolean) {
+    async updateMessage(chatId: string, messageId: string, content: string, isLoading?: boolean) {
       const message = this.getMessage(chatId, messageId);
       if (message) {
         message.content = content;
@@ -130,7 +146,7 @@ export const useChatStore = defineStore('chat', {
           }
         }
 
-        this.persistChats();
+        await this.persistChat(chatId);
       }
     },
 
@@ -161,13 +177,13 @@ export const useChatStore = defineStore('chat', {
         });
 
         const newTitle = JSON.parse(response?.message?.content)?.title;
-        if (newTitle) this.renameChat(chatId, newTitle);
+        if (newTitle) await this.renameChat(chatId, newTitle);
       } catch (error) {
         console.error('Error generating chat title:', error);
       }
     },
 
-    async sendMessage(chatId: string, content: string, attachmentContent: { content: string, type: 'text' | 'image', meta: File } | null = null) {
+    async sendMessage(chatId: string, content: string, attachmentContent: Attachment | null = null) {
       try {
         const chat = this.activeChat;
         if (!chat) throw new Error('No active chat');
@@ -196,9 +212,9 @@ ${metaInfo}
             }
           }
 
-          userMessageId = this.addMessage(chatId, { role: 'user', content: finalContent }, attachmentContent);
+          userMessageId = await this.addMessage(chatId, { role: 'user', content: finalContent }, attachmentContent);
         } else {
-          userMessageId = this.addMessage(chatId, { role: 'user', content: finalContent });
+          userMessageId = await this.addMessage(chatId, { role: 'user', content: finalContent });
         }
 
         if (!userMessageId) return;
@@ -208,7 +224,7 @@ ${metaInfo}
             model: this.selectedModel,
             prompt: finalContent,
             images,
-            stream: true, // Включаем стриминг для /api/generate
+            stream: true,
           };
 
           const response = await fetch(`${this.settings.ollamaLink}/api/generate`, {
@@ -236,9 +252,9 @@ ${metaInfo}
               try {
                 const data = JSON.parse(line);
                 if (data.response) {
-                  assistantMessageId ??= this.addMessage(chatId, { role: 'assistant', content: '', isLoading: true });
+                  assistantMessageId ??= await this.addMessage(chatId, { role: 'assistant', content: '', isLoading: true });
                   assistantContent += data.response;
-                  this.updateMessage(chatId, assistantMessageId!, assistantContent);
+                  await this.updateMessage(chatId, assistantMessageId!, assistantContent);
                 }
               } catch (e) {
                 console.error('Error parsing chunk:', e);
@@ -248,7 +264,7 @@ ${metaInfo}
 
           if (assistantMessageId) {
             const message = this.getMessage(chatId, assistantMessageId);
-            if (message) this.updateMessage(chatId, assistantMessageId, message.content, false);
+            if (message) await this.updateMessage(chatId, assistantMessageId, message.content, false);
           }
         } else {
           const body = {
@@ -286,9 +302,9 @@ ${metaInfo}
               try {
                 const data = JSON.parse(line);
                 if (data.message?.role === 'assistant' && data.message.content) {
-                  assistantMessageId ??= this.addMessage(chatId, { role: 'assistant', content: '', isLoading: true });
+                  assistantMessageId ??= await this.addMessage(chatId, { role: 'assistant', content: '', isLoading: true });
                   assistantContent += data.message.content;
-                  this.updateMessage(chatId, assistantMessageId!, assistantContent);
+                  await this.updateMessage(chatId, assistantMessageId!, assistantContent);
                 }
               } catch (e) {
                 console.error('Error parsing chunk:', e);
@@ -298,15 +314,13 @@ ${metaInfo}
 
           if (assistantMessageId) {
             const message = this.getMessage(chatId, assistantMessageId);
-            if (message) this.updateMessage(chatId, assistantMessageId, message.content, false);
+            if (message) await this.updateMessage(chatId, assistantMessageId, message.content, false);
           }
         }
 
         if (this.activeChat && this.shouldGenerateTitle(this.activeChat)) {
           await this.generateChatTitle(chatId);
         }
-
-        this.persistChats();
       } catch (error: any) {
         if (error.name === 'AbortError') {
           console.log('Request aborted');
@@ -319,28 +333,31 @@ ${metaInfo}
       }
     },
 
-    editMessage(chatId: string, messageId: string, newContent: string, dropFollowing = false) {
+    async editMessage(chatId: string, messageId: string, newContent: string, dropFollowing = false) {
       const chat = this.getChat(chatId);
       if (!chat) return;
 
       const index = chat.messages.findIndex(m => m.id === messageId);
+
       if (index !== -1) {
         chat.messages[index].content = newContent;
+
         if (dropFollowing) {
           chat.messages = chat.messages.slice(0, index + 1);
         }
-        this.persistChats();
+
+        await this.persistChat(chatId);
       }
     },
 
-    deleteMessage(chatId: string, messageId: string) {
+    async deleteMessage(chatId: string, messageId: string) {
       const chat = this.getChat(chatId);
       if (!chat) return;
 
       const index = chat.messages.findIndex(m => m.id === messageId);
       if (index !== -1) {
-        chat.messages = chat.messages.slice(0, index);
-        this.persistChats();
+        chat.messages.splice(index, 1);
+        await this.persistChat(chatId);
       }
     },
 
@@ -355,7 +372,7 @@ ${metaInfo}
       if (prevMessage.role !== 'user') return;
 
       chat.messages = chat.messages.slice(0, index - 1);
-      this.persistChats();
+      await this.persistChat(chat.id);
 
       await this.sendMessage(chatId, prevMessage.content, prevMessage.attachmentContent ? {
         content: prevMessage.attachmentContent,
@@ -408,7 +425,7 @@ ${metaInfo}
             this.memory.shift();
           }
 
-          localStorage.setItem('privateGPTMemory', JSON.stringify(this.memory));
+          await saveMemory(this.memory);
           return summary;
         }
 

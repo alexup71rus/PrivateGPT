@@ -31,7 +31,7 @@ const setDefaultModel = () => {
   }
 };
 
-const toggleSettings = () => {
+const toggleSettings = async () => {
   if (props.isChatPage) {
     router.push(`/settings`);
   } else {
