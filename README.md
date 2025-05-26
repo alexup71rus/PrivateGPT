@@ -27,8 +27,9 @@
 
 Download and configure via Ollama:
 
-1. **Summarization model** (used for persistent memory)
-2. **Image generation model**
+1. **Summarization model** (used for persistent memory and generation titles)
+2. **RAG model** (used for persistent memory)
+3. **Image generation model**
 
 ### 🌐 Optional: SearxNG Search Engine
 
