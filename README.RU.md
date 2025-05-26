@@ -4,6 +4,8 @@
 
 <img src="./src/assets/logo.svg" alt="Logo" width="100" />
 
+<img src="./src/assets/img.png" alt="Logo" width="100%" />
+
 ## 🚀 Возможности
 
 * 💬 Работа с локальными LLM через **Ollama**

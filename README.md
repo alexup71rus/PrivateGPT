@@ -1,31 +1,33 @@
-# PrivateGPT
+## 🌍 English
 
-Локальный клиент для нейросетей с функциональностью уровня ChatGPT, Groq и Яндекс Алисы — но полностью приватный и настраиваемый.
+**PrivateGPT** is a local AI client replicating the functionality of ChatGPT, Groq, and Yandex Alice — but fully private and self-hosted.
 
 <img src="./src/assets/logo.svg" alt="Logo" width="100" />
 
-## 🚀 Возможности
+<img src="./src/assets/img.png" alt="Logo" width="100%" />
 
-* 💬 Работа с локальными LLM через **Ollama**
-* 🧠 Постоянная память (summary): полноценная реализация, как у GPT
-* 🖼️ Генерация изображений
-* 📁 Создание папок и организация чатов по проектам
-* 🔍 Поиск по истории чатов
-* 📄 Загрузка и анализ документов
-* 🖼️ Загрузка и просмотр изображений
-* ⚡ Быстрые сниппеты (переприсваиваемые шаблоны запросов)
-* ⚙️ Настраиваемая база кода — легко модифицировать под любые задачи
+### 🚀 Features
 
-## ⚙️ Необходимые модели
+* 💬 Works with local LLMs via **Ollama**
+* 🧠 Persistent memory (summarization-based), like GPT
+* 🖼️ Image generation
+* 📁 Chat folders for organizing by project
+* 🔍 Search through chat history
+* 📄 Upload and analyze documents
+* 🖼️ Upload and view images
+* ⚡ Custom prompt snippets
+* ⚙️ Minimal, easily adaptable codebase
 
-Через Ollama необходимо загрузить и указать в настройках:
+### ⚙️ Required Models
 
-1. **Модель для саммаризации** (используется для постоянной памяти)
-2. **Модель для генерации изображений**
+Download and configure via Ollama:
 
-## 🌐 Настройка поиска через SearxNG
+1. **Summarization model** (used for persistent memory)
+2. **Image generation model**
 
-### Быстрый запуск:
+### 🌐 Optional: SearxNG Search Engine
+
+To enable search, run SearxNG:
 
 ```bash
 docker run --restart=always -d -p 8888:8080 \
@@ -35,7 +37,7 @@ docker run --restart=always -d -p 8888:8080 \
   --name SearXNG searxng/searxng
 ```
 
-или:
+Or:
 
 ```bash
 docker run -d \
@@ -45,17 +47,17 @@ docker run -d \
   searxng/searxng
 ```
 
-## 📦 Установка
+### 📦 Installation
 
 ```bash
 pnpm install
 pnpm dev
 ```
 
-## 🧠 Почему PrivateGPT?
+### 💡 Why PrivateGPT?
 
-> Это полноценный аналог коммерческих AI-клиентов, работающий полностью локально, с приватностью, гибкостью и чистой минималистичной кодовой базой, которую легко адаптировать под свои нужды.
+> A full-featured local AI client with private memory, fast search, flexible prompts, and a clean codebase you can extend freely.
 
-## 📄 Лицензия
+### 📄 License
 
 MIT
