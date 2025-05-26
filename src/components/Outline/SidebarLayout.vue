@@ -4,8 +4,9 @@ import {computed, onMounted, ref} from "vue";
 import {useAppSettings} from "@/composables/useAppSettings.ts";
 import {useRouter} from "vue-router";
 import {useChatActions} from "@/composables/useChatActions.ts";
-import type {ChatModel} from "@/types/chats.ts";
 import {useAppStore} from "@/stores/app.ts";
+import {useAlert} from "@/plugins/alertPlugin.ts";
+import {useDeleteButton} from "@/composables/useDeleteButton.ts";
 
 const props = defineProps<{
   isChatPage: boolean;
@@ -14,20 +15,21 @@ const props = defineProps<{
 const router = useRouter();
 const app = useAppStore();
 const chat = useChatStore();
-const { settings, updateSettings } = useAppSettings();
+const { settings } = useAppSettings();
+const { showSnackbar, showConfirm } = useAlert();
 const { onNewChat, selectChat, deleteChat } = useChatActions();
+const { handleFirstClick, handleSecondClick, resetDeletePending, isPending } = useDeleteButton(deleteChat);
 
-const modelNames = computed(() => chat.models?.map((model: ChatModel) => model.name) || []);
-const selectedModel = ref(settings.defaultModel);
-
-const isChangedModel = computed(() => {
-  return selectedModel.value !== settings.defaultModel;
+const searchQuery = ref<string>('');
+const filteredChats = computed(() => {
+  if (!searchQuery.value) return chat.chats;
+  return chat.chats.filter((chat) =>
+    chat.title.toLowerCase().includes(searchQuery.value.toLowerCase())
+  );
 });
 
-const setDefaultModel = () => {
-  if (selectedModel.value) {
-    updateSettings({ defaultModel: selectedModel.value });
-  }
+const handleChatClick = (id: string) => {
+  selectChat(id);
 };
 
 const toggleSettings = async () => {
@@ -56,6 +58,21 @@ const initializeChat = () => {
   }
 };
 
+const removeAllChats = async () => {
+  showConfirm({
+    title: 'Предупреждение',
+    message: 'Вы действительно хотите удалить все чаты?',
+    buttons: [
+      { text: 'Да', color: 'warning', value: true },
+      { text: 'Отмена', color: 'white', value: false }
+    ],
+    resolve: () => {
+      chat.clearChats();
+      showSnackbar({ message: 'Все чаты успешно удалены', type: 'success' });
+    },
+  });
+};
+
 onMounted(initializeChat);
 </script>
 
@@ -63,41 +80,53 @@ onMounted(initializeChat);
   <div :class="['sidebar', { 'sidebar--opened': app.isAsideOpen, 'sidebar-chat': isChatPage }]">
     <div class="sidebar__collapsed-item">
       <v-btn
+        class="sidebar__burger"
         :icon="app.isAsideOpen ? 'mdi-backburger' : 'mdi-menu'"
         @click="app.setAside(!app.isAsideOpen)"
       />
-      <transition name="slide-fade">
-        <img v-show="app.isAsideOpen" alt="Chat logo" class="sidebar__logo" src="@/assets/logo.svg">
-      </transition>
+      <img
+        alt="Chat logo"
+        class="sidebar__logo"
+        :class="{ 'fade-in': app.isAsideOpen, 'fade-out': !app.isAsideOpen }"
+        src="@/assets/logo.svg"
+      >
       <v-btn class="new-chat-btn" icon="mdi-autorenew" @click="onNewChat" />
     </div>
-    <template v-if="isChatPage">
-      <v-autocomplete
-        v-model="selectedModel"
-        :items="modelNames"
-        class="models-autocomplete"
-        label="Модель"
-        variant="solo-inverted"
-      ></v-autocomplete>
-      <a
-        v-if="isChangedModel"
-        class="select-model-as-default"
-        @click="setDefaultModel"
-      >
-        Установить по умолчанию
-      </a>
-    </template>
 
     <transition name="fade">
       <div v-if="app.isAsideOpen && isChatPage" class="chat-list">
+        <v-text-field
+          v-model="searchQuery"
+          label="Поиск"
+          variant="solo-inverted"
+          hide-details="auto"
+          clearable
+        >
+          <template v-slot:append-inner>
+            <v-btn
+              icon="mdi-trash-can"
+              color="red"
+              variant="plain"
+              v-tooltip="'Удалить все чаты'"
+              @click="removeAllChats"
+            />
+          </template>
+        </v-text-field>
         <div
-          v-for="_chat in chat.chats"
+          v-for="_chat in filteredChats"
           :key="_chat.id"
           :class="['chat-item', { 'chat-item--selected': chat.activeChatId === _chat.id }]"
-          @click="selectChat(_chat.id)"
+          @click="handleChatClick(_chat.id)"
         >
           <span>{{ _chat.title }}</span>
-          <v-btn icon="mdi-delete" size="small" @click.stop="deleteChat(_chat.id)" />
+          <v-btn
+            class="delete-btn"
+            :color="isPending(_chat.id) ? 'red' : ''"
+            icon="mdi-delete"
+            size="small"
+            @click.stop="isPending(_chat.id) ? handleSecondClick(_chat.id) : handleFirstClick(_chat.id)"
+            @mouseleave="resetDeletePending"
+          />
         </div>
       </div>
     </transition>
@@ -129,6 +158,10 @@ onMounted(initializeChat);
     width: var(--aside-width--showed);
   }
 
+  &__burger {
+    z-index: 1;
+  }
+
   &__logo {
     position: absolute;
     left: 50%;
@@ -136,6 +169,16 @@ onMounted(initializeChat);
     height: 50px;
     transform: translateX(-50%);
     transition: .8s;
+    pointer-events: none;
+    animation: fadeInOut 0.3s ease-in-out forwards;
+  }
+
+  &__logo.fade-in {
+    animation: fadeIn 0.3s ease-in-out forwards;
+  }
+
+  &__logo.fade-out {
+    animation: fadeOut 0.15s ease-in-out forwards;
   }
 
   &__collapsed-item {
@@ -151,18 +194,6 @@ onMounted(initializeChat);
   top: var(--padding-body);
   right: calc(var(--padding-body) * -1);
   transition: .3s;
-}
-
-.select-model-as-default,
-.models-autocomplete {
-  position: absolute;
-  transform: translateX(100%);
-  top: calc(var(--padding-body) - 3px);
-  right: -70px;
-  width: 300px;
-  min-width: 300px;
-  max-width: 300px;
-  transition: .5s;
 }
 
 .select-model-as-default {
@@ -195,10 +226,6 @@ onMounted(initializeChat);
     right: var(--padding-body);
     transform: translateX(0);
   }
-
-  .models-autocomplete {
-    right: calc(var(--padding-body) * -1);
-  }
 }
 
 .settings-btn {
@@ -209,12 +236,14 @@ onMounted(initializeChat);
   display: flex;
   flex-direction: column;
   gap: 10px;
+  padding-top: 6px;
   margin-top: 30px;
   max-height: 400px;
   overflow-y: auto;
 }
 
 .chat-item {
+  position: relative;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -223,6 +252,7 @@ onMounted(initializeChat);
   cursor: pointer;
   border-radius: 10px;
   width: 330px;
+  height: 50px;
 
   &--selected {
     background-color: rgba(var(--v-theme-background) / 80%);
@@ -235,6 +265,17 @@ onMounted(initializeChat);
 
   &:not(.chat-item--selected):hover {
     background-color: rgba(var(--v-theme-background) / 60%) !important;
+  }
+
+  .delete-btn {
+    position: absolute;
+    right: 5px;
+    opacity: 0;
+    transition: .15s;
+  }
+
+  &:hover .delete-btn {
+    opacity: 1;
   }
 }
 
@@ -251,36 +292,5 @@ onMounted(initializeChat);
 
 .chat-item:hover {
   background-color: rgba(0, 0, 0, 0.05);
-}
-
-/* Transition styles for chat-list */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.3s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-
-.fade-enter-to,
-.fade-leave-from {
-  opacity: 1;
-}
-
-.slide-fade-enter-active {
-  opacity: 1;
-  transition: opacity .4s ease-out;
-}
-
-.slide-fade-leave-active {
-  opacity: 0;
-  transition: all 0.15s cubic-bezier(1, 0.5, 0.8, 1);
-}
-
-.slide-fade-enter-from,
-.slide-fade-leave-to {
-  opacity: 0;
 }
 </style>

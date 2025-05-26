@@ -2,11 +2,13 @@
 import {computed, ref, watch} from "vue";
 import {useChatStore} from "@/stores/chat.ts";
 import {useChatScroll} from "@/composables/useChatScroll.ts";
+import {useAppStore} from "@/stores/app.ts";
 
+const app = useAppStore();
 const chat = useChatStore();
 const chatTitle = ref(chat.activeChat?.title ?? '');
 const messages = computed(() => chat.activeChat?.messages ?? []);
-const { chatMessagesRef } = useChatScroll(messages);
+const { chatMessagesRef, isShowScrollDown, scrollDown } = useChatScroll(messages);
 const isLoading = computed(() => chat.activeChat?.messages[chat.activeChat.messages.length - 1]?.role === 'user' && chat.isSending);
 
 watch(() => chatTitle.value || '', (newTitle: string) => {
@@ -20,9 +22,14 @@ watch(() => chat.activeChat?.title || '', (newTitle: string) => {
 
 <template>
   <div class="chat-page">
-    <div class="chat-title">
-      <v-text-field v-model="chatTitle" :disabled="!chat.activeChat?.id" label="Заголовок чата" variant="solo"></v-text-field>
-
+    <div :class="['chat-title', { 'chat-title--opened': app.isAsideOpen }]">
+      <v-text-field
+        v-model="chatTitle"
+        :disabled="!chat.activeChat?.id"
+        label="Заголовок чата"
+        variant="solo"
+        hide-details="auto"
+      ></v-text-field>
     </div>
 
     <div ref="chatMessagesRef" class="chat-messages">
@@ -51,21 +58,43 @@ watch(() => chat.activeChat?.title || '', (newTitle: string) => {
       </template>
     </div>
 
+    <v-fade-transition>
+      <v-btn
+        v-show="isShowScrollDown"
+        class="chat-scroll-down"
+        variant="elevated"
+        color="blue"
+        icon="mdi-arrow-collapse-down"
+        @click="scrollDown"
+      ></v-btn>
+    </v-fade-transition>
+
     <MessageBox class="message-box" />
   </div>
 </template>
 
 <style lang="scss" scoped>
-.chat-page {
-  --chat-title-max-width: 300px;
-  --message-max-width: 800px;
 
+.chat-page {
+  position: relative;
   display: flex;
   flex-direction: column;
   max-height: 100vh;
   width: 100%;
   height: 100%;
   padding: 7px 16px 16px;
+
+  .chat-title {
+    padding-bottom: 15px;
+    width: 100%;
+    max-width: 400px;
+    margin-left: 50px;
+    transition: .4s ease-in-out;
+
+    &--opened {
+      margin-left: 0;
+    }
+  }
 
   .chat-logo {
     filter: grayscale(1);
@@ -75,12 +104,16 @@ watch(() => chat.activeChat?.title || '', (newTitle: string) => {
     margin: auto auto;
     text-align: center;
     font-size: 18px;
+    animation: fadeIn 0.3s ease-in-out forwards;
   }
 
-  .chat-title {
-    margin-left: auto;
-    width: 100%;
-    max-width: var(--chat-title-max-width);
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: .3;
+    }
   }
 
   .chat-messages {
@@ -96,7 +129,7 @@ watch(() => chat.activeChat?.title || '', (newTitle: string) => {
   .message-box {
     margin: 0 auto;
     width: 100%;
-    max-width: var(--message-max-width);
+    max-width: 800px;
   }
 
   .loader {
@@ -106,6 +139,14 @@ watch(() => chat.activeChat?.title || '', (newTitle: string) => {
     min-height: 40px;
     max-height: 40px;
     overflow: hidden;
+  }
+
+  .chat-scroll-down {
+    position: absolute;
+    transform: translateX(-50%);
+    left: 50%;
+    bottom: 130px;
+    color: white;
   }
 }
 </style>

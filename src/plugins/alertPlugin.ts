@@ -19,8 +19,14 @@ export function createAlertPlugin() {
         width: o.width,
         buttons: o.buttons,
         isOpen: true,
-        resolve,
-        reject
+        resolve: (value: any) => {
+          resolve(value);
+          if (value) o.resolve();
+        },
+        reject: (value: any) => {
+          reject(value);
+          if (o.reject) o.reject();
+        }
       }
     })
   }
@@ -38,8 +44,14 @@ export function createAlertPlugin() {
         width: o.width,
         buttons: o.buttons,
         isOpen: true,
-        resolve,
-        reject
+        resolve: (value: any) => {
+          resolve(value);
+          if (value) o.resolve();
+        },
+        reject: (value: any) => {
+          reject(value);
+          if (o.reject) o.reject();
+        }
       }
     })
   }

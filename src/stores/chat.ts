@@ -5,7 +5,7 @@ import type {Attachment, AttachmentMeta, Chat, MemoryEntry, Message} from '@/typ
 import {throttle} from '@/utils/helpers.ts';
 import {useAppSettings} from '@/composables/useAppSettings.ts';
 import type {ISettings} from '@/types/settings.ts';
-import {deleteChat, loadChats, loadMemory, saveChat, saveMemory} from '@/utils/storage.ts';
+import {clearAllChats, deleteChat, loadChats, loadMemory, saveChat, saveMemory} from '@/utils/storage.ts';
 
 const throttledSaveChat = throttle(async (chat: Chat) => {
   await saveChat(chat);
@@ -37,12 +37,8 @@ export const useChatStore = defineStore('chat', {
   },
   actions: {
     async initialize() {
-      this.chats = await loadChats().then(res => res.reverse());
+      this.chats = await loadChats();
       this.memory = await loadMemory();
-
-      if (this.chats.length === 0) {
-        await this.createChat();
-      }
     },
 
     async persistChat(chatId: string) {
@@ -65,7 +61,7 @@ export const useChatStore = defineStore('chat', {
     },
 
     shouldGenerateTitle(chat: Chat): boolean {
-      return !chat.title || chat.title === 'Новый чат';
+      return !chat.title || chat.title === this.settings.defaultChatTitle;
     },
 
     setIsSending(value: boolean) {
@@ -75,8 +71,9 @@ export const useChatStore = defineStore('chat', {
     async createChat() {
       const newChat: Chat = {
         id: crypto.randomUUID(),
-        title: 'Новый чат',
+        title: this.settings.defaultChatTitle,
         messages: [],
+        timestamp: new Date().getTime()
       };
 
       this.chats.unshift(newChat);
@@ -95,6 +92,18 @@ export const useChatStore = defineStore('chat', {
         if (this.activeChatId === chatId) {
           this.activeChatId = this.chats[0]?.id || (await this.createChat())?.id || '';
         }
+      }
+    },
+
+    async clearChats() {
+      try {
+        this.chats = [];
+        this.activeChatId = '';
+        await clearAllChats();
+        this.activeChatId = (await this.createChat()).id;
+      } catch (error) {
+        console.error('Error clearing chats:', error);
+        throw error;
       }
     },
 
@@ -151,7 +160,25 @@ export const useChatStore = defineStore('chat', {
 
     async generateChatTitle(chatId: string) {
       const chat = this.getChat(chatId);
-      if (!chat || chat.messages.length < 2) return;
+      if (!chat || chat.messages.length < 1) return;
+
+      const generateDefaultTitle = (content: string | undefined): string => {
+        if (!content) return this.settings.defaultChatTitle;
+        const words = content.split(' ').filter((_, i) => i <= 2);
+        return words.length > 0 ? words.join(' ') : this.settings.defaultChatTitle;
+      };
+
+      if (!this.settings.systemModel) {
+        const newTitle = generateDefaultTitle(chat.messages[0]?.content);
+        await this.renameChat(chatId, newTitle);
+        return;
+      }
+
+      if (chat.messages.length < 2) {
+        const newTitle = generateDefaultTitle(chat.messages[0]?.content);
+        await this.renameChat(chatId, newTitle);
+        return;
+      }
 
       const messages = chat.messages.slice(0, 2);
 
@@ -164,21 +191,31 @@ export const useChatStore = defineStore('chat', {
             model: this.settings.systemModel,
             messages: [
               { role: 'system', content: this.settings.titlePrompt },
-              ...messages.map(msg => ({ role: msg.role, content: msg.content }))
+              ...messages.map(msg => ({ role: msg.role, content: msg.content })),
             ],
             stream: false,
             format: {
               type: 'object',
               properties: { title: { type: 'string' } },
-              required: ['title']
-            }
-          }
+              required: ['title'],
+            },
+          },
         });
 
-        const newTitle = JSON.parse(response?.message?.content)?.title;
-        if (newTitle) await this.renameChat(chatId, newTitle);
+        const content = response?.message?.content;
+        if (!content) throw new Error('No content in API response');
+
+        const parsed = JSON.parse(content);
+        const newTitle = parsed?.title;
+        if (typeof newTitle !== 'string' || !newTitle) {
+          throw new Error('Invalid title in API response');
+        }
+
+        await this.renameChat(chatId, newTitle);
       } catch (error) {
         console.error('Error generating chat title:', error);
+        const newTitle = generateDefaultTitle(chat.messages[0]?.content);
+        await this.renameChat(chatId, newTitle);
       }
     },
 

@@ -17,7 +17,7 @@ const { isDarkTheme } = useAppSettings();
 // https://vuetifyjs.com/en/introduction/why-vuetify/#feature-guides
 export default createVuetify({
   theme: {
-    defaultTheme: isDarkTheme ? 'dark' : 'light',
+    defaultTheme: isDarkTheme.value ? 'dark' : 'light',
     themes: {
       light: {
         colors: {

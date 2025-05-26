@@ -6,12 +6,13 @@ import type {ISettings} from "@/types/settings.ts";
 export const useAppStore = defineStore('app', {
   state: () => {
     const { http } = useHttpService();
-    const { settings } = useAppSettings();
+    const { settings, updateSettings } = useAppSettings();
 
     return {
       http,
       settings: settings as ISettings,
-      isAsideOpen: false,
+      isAsideOpen: settings.isAsideOpen ?? false,
+      updateSettings,
     };
   },
   getters: {
@@ -19,6 +20,9 @@ export const useAppStore = defineStore('app', {
   actions: {
     setAside(value: boolean) {
       this.isAsideOpen = value;
+      this.updateSettings({
+        isAsideOpen: value,
+      });
     },
   },
 })

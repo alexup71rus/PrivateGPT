@@ -1,10 +1,11 @@
 <script lang="ts" setup>
-import {computed, nextTick, onMounted, ref} from "vue";
+import {computed, nextTick, onMounted, ref, watch} from "vue";
 import {useChatStore} from "@/stores/chat.ts";
 import {useAppSettings} from "@/composables/useAppSettings.ts";
+import type {ChatModel} from "@/types/chats.ts";
 
 const chat = useChatStore();
-const { settings } = useAppSettings();
+const { settings, updateSettings } = useAppSettings();
 const textareaRef = ref<HTMLInputElement>();
 const fileInputRef = ref<HTMLInputElement>();
 const activeChat = computed(() => chat.activeChat);
@@ -14,6 +15,26 @@ const attachment = ref<File | null>(null);
 const attachmentContent = ref<{ content: string, type: 'text' | 'image', meta: File } | null>(null);
 const isSearch = ref(settings.isSearchAsDefault);
 const canSend = computed(() => chat.isSending ? false : messageText.value.trim());
+
+const modelNames = computed(() => chat.models?.map((model: ChatModel) => model.name) || []);
+const selectedModel = ref(settings.defaultModel);
+const isChangedModel = computed(() => selectedModel.value !== settings.defaultModel);
+const setDefaultModel = () => {
+  if (selectedModel.value) {
+    updateSettings({ defaultModel: selectedModel.value });
+  }
+};
+const modelSearch = ref('');
+const filteredModels = computed(() =>
+  modelSearch.value
+    ? modelNames.value.filter(name =>
+      name.toLowerCase().includes(modelSearch.value.toLowerCase()))
+    : modelNames.value
+);
+
+function selectModel(model: string) {
+  selectedModel.value = model;
+}
 
 function handleAttachClick() {
   fileInputRef.value?.click();
@@ -53,6 +74,7 @@ function handleFilesSelected(event: Event) {
 function removeAttachment() {
   attachment.value = null;
   attachmentContent.value = null;
+  nextTick(() => textareaRef.value?.focus());
 }
 
 function onFormSubmit(event: Event) {
@@ -69,20 +91,19 @@ async function sendMessage() {
     messageText.value = '';
     attachment.value = null;
     attachmentContent.value = null;
-    textareaRef.value?.focus();
   } finally {
     chat.setIsSending(false);
   }
 }
 
-function stopGeneration() {
+async function stopGeneration() {
   if (chat.abortController) {
     chat.abortController.abort();
     chat.setIsSending(false);
 
     const lastMessage = activeChat.value?.messages[activeChat.value.messages.length - 1];
     if (lastMessage?.isLoading) {
-      chat.updateMessage(activeChatId.value, lastMessage.id, lastMessage.content, false);
+      await chat.updateMessage(activeChatId.value, lastMessage.id, lastMessage.content, false);
       chat.setIsSending(false);
     }
   }
@@ -91,6 +112,10 @@ function stopGeneration() {
 onMounted(() => {
   nextTick(() => textareaRef.value?.focus());
 });
+
+watch(() => [chat.activeChatId, chat.isSending, chat.selectedModel], (newVal, oldVal) => {
+  nextTick(() => textareaRef.value?.focus());
+}, { deep: true })
 </script>
 
 <template>
@@ -120,6 +145,58 @@ onMounted(() => {
     </div>
 
     <div class="chat-input-actions">
+      <v-menu location="top" :close-on-content-click="false">
+        <template #activator="{ props }">
+          <v-btn
+            v-bind="props"
+            :color="isChangedModel ? 'primary' : 'white'"
+            class="model-btn"
+            variant="tonal"
+            prepend-icon="mdi-robot"
+            append-icon="mdi-chevron-down"
+          >
+            {{ selectedModel || 'Модель' }}
+          </v-btn>
+        </template>
+
+        <v-card min-width="300">
+          <v-card-text class="pa-2">
+            <div class="autocomplete-model__list">
+              <v-list-item
+                v-for="model in filteredModels"
+                :active="model === selectedModel"
+                :key="model"
+                :value="model"
+                @click="selectModel(model)"
+              >
+                <div class="autocomplete-model__item" :title="model">
+                  {{ model }}
+                  <v-btn
+                    v-if="isChangedModel && selectedModel === model"
+                    icon="mdi-check-circle"
+                    variant="text"
+                    density="compact"
+                    color="primary"
+                    @click="setDefaultModel"
+                    v-tooltip:top="'Установить по умолчанию'"
+                  />
+                </div>
+              </v-list-item>
+            </div>
+
+            <v-text-field
+              v-model="modelSearch"
+              placeholder="Фильтр моделей"
+              dense
+              hide-details
+              clearable
+              variant="solo-filled"
+              class="mb-2"
+            />
+          </v-card-text>
+        </v-card>
+      </v-menu>
+      <v-spacer />
       <v-btn
         :color="attachment ? 'blue' : 'white'"
         :disabled="chat.isSending"
@@ -140,7 +217,6 @@ onMounted(() => {
           @click.stop="removeAttachment"
         />
       </v-btn>
-
       <v-btn
         :color="isSearch ? 'blue' : 'white'"
         :disabled="chat.isSending"
@@ -151,7 +227,6 @@ onMounted(() => {
       >
         Поиск
       </v-btn>
-      <v-spacer />
       <v-btn
         :color="chat.isSending ? 'error' : undefined"
         :disabled="chat.isSending ? false : !canSend"
@@ -239,5 +314,33 @@ onMounted(() => {
       transform: translate(-50%, -50%);
     }
   }
+}
+
+::v-deep(.model-btn) {
+  max-width: 300px;
+  width: auto;
+  position: relative;
+  display: flex;
+  justify-content: start;
+  overflow: hidden;
+}
+
+::v-deep(.autocomplete-model__list) {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 15px;
+  max-height: 300px;
+  overflow: auto;
+}
+
+::v-deep(.autocomplete-model__item) {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-wrap: nowrap;
 }
 </style>

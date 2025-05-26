@@ -2,7 +2,7 @@ import type {Chat, MemoryEntry} from "@/types/chats.ts";
 
 export async function openDB(): Promise<IDBDatabase> {
   return new Promise<IDBDatabase>((resolve, reject) => {
-    const request: IDBOpenDBRequest = indexedDB.open('chatDB', 1);
+    const request: IDBOpenDBRequest = indexedDB.open('PrivateGPT', 1);
     request.onupgradeneeded = (event: IDBVersionChangeEvent) => {
       const db: IDBDatabase = (event.target as IDBOpenDBRequest).result;
       db.createObjectStore('chats', { keyPath: 'id' });
@@ -21,7 +21,10 @@ export async function loadChats(): Promise<Chat[]> {
     const request: IDBRequest<Chat[]> = store.getAll();
 
     return new Promise((resolve, reject) => {
-      request.onsuccess = () => resolve(request.result || []);
+      request.onsuccess = () => resolve(
+        (request.result || [])
+          .sort((a, b) => b.timestamp - a.timestamp)
+      );
       request.onerror = () => reject(request.error);
     });
   } catch (error) {
@@ -88,14 +91,6 @@ export async function saveChat(chat: Chat): Promise<void> {
       ...chat,
       messages: chat.messages.map(message => ({
         ...message,
-        attachmentMeta: message.attachmentMeta
-          ? {
-              type: message.attachmentMeta.type,
-              name: message.attachmentMeta.name,
-              size: message.attachmentMeta.size,
-              lastModified: message.attachmentMeta.lastModified,
-            }
-          : undefined,
       })),
     };
 
@@ -127,6 +122,22 @@ export async function deleteChat(chatId: string): Promise<void> {
     });
   } catch (error) {
     console.error('Error deleting chat from IndexedDB:', error);
+    throw error;
+  }
+}
+
+export async function clearAllChats(): Promise<void> {
+  try {
+    const db: IDBDatabase = await openDB();
+    const transaction: IDBTransaction = db.transaction(['chats'], 'readwrite');
+    const store: IDBObjectStore = transaction.objectStore('chats');
+    await new Promise<void>((resolve, reject) => {
+      const request: IDBRequest = store.clear();
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  } catch (error) {
+    console.error('Error clearing chats from IndexedDB:', error);
     throw error;
   }
 }

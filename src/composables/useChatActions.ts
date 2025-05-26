@@ -27,10 +27,21 @@ export function useChatActions() {
 
   const selectChat = async (chatId: string) => {
     try {
-      if (chat.chats?.some(c => c.id === chatId)) {
-        chat.activeChatId = chatId;
-        await navigateWithHash(chatId);
-      }
+      let tries = 10;
+      let interval: number;
+
+      interval = setInterval(async () => {
+        if (tries <= 0) {
+          clearInterval(interval);
+        }
+
+        tries--;
+
+        if (chat.chats?.some(c => c.id === chatId)) {
+          chat.activeChatId = chatId;
+          await navigateWithHash(chatId);
+        }
+      }, 1)
     } catch (error) {
       console.error('Error selecting chat:', error);
     }

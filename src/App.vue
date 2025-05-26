@@ -16,11 +16,26 @@ const { isChatPage } = useAppRouting();
 onMounted(async () => {
   await chat.fetchModels();
   await chat.initialize();
+
+  const hash = window.location.hash.replace('#', '');
+  if (chat.chats.length === 0) {
+    const newChatId = (await chat.createChat())?.id;
+    if (newChatId) await selectChat(newChatId);
+  } else if (!hash) {
+    await selectChat(chat.chats[0].id);
+  } else {
+    await selectChat(hash);
+  }
 });
 
-watch(() => route.hash, async (newHash) => {
-  await selectChat(newHash.replace('#', ''));
-});
+watch(
+  () => route.hash,
+  async (newHash) => {
+    if (newHash) {
+      await selectChat(newHash.replace('#', ''));
+    }
+  }
+);
 </script>
 
 <template>
