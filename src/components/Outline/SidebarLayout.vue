@@ -66,7 +66,9 @@ onMounted(initializeChat);
         :icon="app.isAsideOpen ? 'mdi-backburger' : 'mdi-menu'"
         @click="app.setAside(!app.isAsideOpen)"
       />
-      <img v-show="app.isAsideOpen" alt="Chat logo" class="sidebar__logo" src="@/assets/logo.svg">
+      <transition name="slide-fade">
+        <img v-show="app.isAsideOpen" alt="Chat logo" class="sidebar__logo" src="@/assets/logo.svg">
+      </transition>
       <v-btn class="new-chat-btn" icon="mdi-autorenew" @click="onNewChat" />
     </div>
     <template v-if="isChatPage">
@@ -265,5 +267,20 @@ onMounted(initializeChat);
 .fade-enter-to,
 .fade-leave-from {
   opacity: 1;
+}
+
+.slide-fade-enter-active {
+  opacity: 1;
+  transition: opacity .4s ease-out;
+}
+
+.slide-fade-leave-active {
+  opacity: 0;
+  transition: all 0.15s cubic-bezier(1, 0.5, 0.8, 1);
+}
+
+.slide-fade-enter-from,
+.slide-fade-leave-to {
+  opacity: 0;
 }
 </style>
