@@ -17,7 +17,7 @@
 * 🧠 Persistent memory (summarization-based), like GPT
 * 🖼️ Image generation
 * 📁 Chat folders for organizing by project
-* 🔍 Search through chat history
+* 🔍 Search to the internet
 * 📄 Upload and analyze documents
 * 🖼️ Upload and view images
 * ⚡ Custom prompt snippets
