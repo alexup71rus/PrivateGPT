@@ -4,6 +4,11 @@
 
 <img src="./src/assets/logo.svg" alt="Logo" width="100" />
 
+### 💡 Why PrivateGPT?
+
+> A full-featured local AI client with private memory, fast search, flexible prompts, and a clean codebase you can extend freely.
+
+
 <img src="./src/assets/img.png" alt="Logo" width="100%" />
 
 ### 🚀 Features
@@ -54,10 +59,7 @@ pnpm install
 pnpm dev
 ```
 
-### 💡 Why PrivateGPT?
-
-> A full-featured local AI client with private memory, fast search, flexible prompts, and a clean codebase you can extend freely.
-
 ### 📄 License
 
-MIT
+[Apache License
+](https://github.com/alexup71rus/PrivateGPT/blob/master/LICENSE)
