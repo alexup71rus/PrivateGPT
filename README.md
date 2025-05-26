@@ -1,4 +1,4 @@
-## 🌍 English
+## 🌍 English [[RU](https://github.com/alexup71rus/PrivateGPT/blob/master/README.RU.md)]
 
 **PrivateGPT** is a local AI client replicating the functionality of ChatGPT, Groq, and Yandex Alice — but fully private and self-hosted.
 

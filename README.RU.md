@@ -1,4 +1,4 @@
-# PrivateGPT
+# PrivateGPT [[EN](https://github.com/alexup71rus/PrivateGPT/blob/master/README.md)]
 
 Локальный клиент для нейросетей с функциональностью уровня ChatGPT, Groq и Яндекс Алисы — но полностью приватный и настраиваемый.
 
