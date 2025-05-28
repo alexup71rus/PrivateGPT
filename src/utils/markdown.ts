@@ -1,8 +1,8 @@
 import hljs from "highlight.js";
-import {Marked} from "marked";
-import {markedHighlight} from "marked-highlight";
+import { Marked } from "marked";
+import { markedHighlight } from "marked-highlight";
 
-export const marked = new Marked(
+const markedInstance = new Marked(
   markedHighlight({
     langPrefix: 'hljs language-',
     highlight(code, lang) {
@@ -23,3 +23,26 @@ export const marked = new Marked(
     }
   })
 );
+
+export function wrapThinkBlocks(html: string): string {
+  if (html.includes('</think>')) {
+    return html.replace(/<\/think>[\s\S]*/gi, '');
+  } else if (html.includes('<think>')) {
+    return html;
+  }
+
+  return '';
+}
+
+function removeThinkBlocks(html: string): string {
+  let result = html.replace(/<think>[\s\S]*?<\/think>/gi, '');
+
+  result = result.replace(/<think>[\s\S]*/gi, '');
+
+  return result;
+}
+
+export function parseMarkdown(markdown: string, isThink = false) {
+  const rawHtml = markedInstance.parse(markdown) as string;
+  return isThink ? wrapThinkBlocks(rawHtml) : removeThinkBlocks(rawHtml);
+}

@@ -4,7 +4,7 @@ import {useChatStore} from "@/stores/chat.ts";
 import {useAlert} from "@/plugins/alertPlugin.ts";
 import {computed, onMounted, ref} from "vue";
 import "highlight.js/styles/default.css";
-import {marked} from "@/utils/markdown.ts";
+import {parseMarkdown, wrapThinkBlocks} from "@/utils/markdown.ts";
 import {useCopyCode} from "@/composables/useCopyCode.ts";
 
 const props = defineProps<{
@@ -26,9 +26,16 @@ const formatFileSize = computed(() => (size: number | undefined) => {
 
 useCopyCode(bubbleRef, showSnackbar);
 
-const parsedContent = computed(() => {
-  return marked.parse(props.message.content);
+const parsedThinkContent = computed(() => {
+  return parseMarkdown(props.message.content, true);
 });
+const parsedContent = computed(() => {
+  return parseMarkdown(props.message.content);
+});
+const formatThinkTime = (milliseconds: number) => {
+  if (milliseconds < 1000) return `${milliseconds} мс`;
+  return `${(milliseconds / 1000).toFixed(1)} сек`;
+};
 
 const copyMessage = async () => {
   console.log(props.message)
@@ -113,7 +120,7 @@ const closeEditDialog = () => {
   isEditDialogOpen.value = false;
 };
 
-onMounted(() => {
+onMounted(async () => {
   bubbleRef.value.addEventListener('click', async (ev: MouseEvent) => {
     const target = ev.target as HTMLElement;
 
@@ -176,6 +183,15 @@ const saveSummary = async () => {
     >
       {{ message.attachmentMeta.name }} [{{ formatFileSize(message.attachmentMeta.size) }}]
     </v-chip>
+    <v-expansion-panels class="think" v-if="message.thinkTime !== undefined">
+      <v-expansion-panel
+        :title="message.isThinking ? `Размышляю... (${formatThinkTime(message.thinkTime ?? 0)})` : `Размышлял в течение: ${formatThinkTime(message.thinkTime ?? 0)}`"
+      >
+        <v-expansion-panel-text>
+          <v-card v-html="parsedThinkContent" />
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+    </v-expansion-panels>
     <div class="content" v-html="parsedContent" />
     <div v-if="false" class="attachments-scroll">
       <div class="attachment" />
@@ -360,4 +376,9 @@ const saveSummary = async () => {
   max-height: 300px;
   overflow: auto;
 }
+
+.think {
+  margin-bottom: 10px;
+}
+
 </style>

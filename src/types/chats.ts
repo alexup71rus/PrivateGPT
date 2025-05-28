@@ -21,6 +21,8 @@ export interface Message {
   attachmentMeta?: AttachmentMeta;
   attachmentContent?: string;
   timestamp?: number;
+  thinkTime?: number;
+  isThinking?: boolean;
 }
 
 export interface Chat {

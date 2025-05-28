@@ -38,6 +38,12 @@
   color: inherit !important;
 }
 
+.v-expansion-panel * {
+  color: rgb(var(--v-theme-on-surface));
+}
+
+/* Transition styles */
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -56,7 +62,6 @@
   }
 }
 
-/* Transition styles */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.3s ease;

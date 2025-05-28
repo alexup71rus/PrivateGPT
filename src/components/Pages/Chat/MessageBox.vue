@@ -103,7 +103,7 @@ async function stopGeneration() {
 
     const lastMessage = activeChat.value?.messages[activeChat.value.messages.length - 1];
     if (lastMessage?.isLoading) {
-      await chat.updateMessage(activeChatId.value, lastMessage.id, lastMessage.content, false);
+      await chat.updateMessage(activeChatId.value, lastMessage.id, lastMessage.content, false, lastMessage.thinkTime, false);
       chat.setIsSending(false);
     }
   }

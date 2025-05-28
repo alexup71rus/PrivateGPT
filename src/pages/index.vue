@@ -25,7 +25,7 @@ watch(() => chat.activeChat?.title || '', (newTitle: string) => {
     <div :class="['chat-title', { 'chat-title--opened': app.isAsideOpen }]">
       <v-text-field
         v-model="chatTitle"
-        :disabled="!chat.activeChat?.id"
+        :disabled="!chat.activeChat?.id || chat.isGeneratingTitle"
         label="Заголовок чата"
         variant="solo"
         hide-details="auto"
