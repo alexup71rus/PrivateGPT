@@ -227,238 +227,236 @@ export const useChatStore = defineStore('chat', {
     },
 
     async sendMessage(chatId: string, content: string, attachmentContent: Attachment | null = null) {
-  try {
-    const chat = this.activeChat;
-    if (!chat) throw new Error('No active chat');
-    if (!this.models.length) throw new Error('No models available');
+      try {
+        const chat = this.activeChat;
+        if (!chat) throw new Error('No active chat');
+        if (!this.models.length) throw new Error('No models available');
 
-    this.abortController?.abort();
-    this.abortController = new AbortController();
+        this.abortController?.abort();
+        this.abortController = new AbortController();
 
-    let finalContent = content;
-    let images: string[] | undefined;
-    let userMessageId: string | null;
+        let finalContent = content;
+        let images: string[] | undefined;
+        let userMessageId: string | null;
 
-    if (attachmentContent) {
-      const file = attachmentContent.meta;
-      const metaInfo = `[Attached: ${file.name}, ${file.size} bytes, modified ${new Date(file.lastModified).toLocaleDateString()}]`;
+        if (attachmentContent) {
+          const file = attachmentContent.meta;
+          const metaInfo = `[Attached: ${file.name}, ${file.size} bytes, modified ${new Date(file.lastModified).toLocaleDateString()}]`;
 
-      if (attachmentContent.meta.type !== 'text' && attachmentContent.meta.type !== 'image') {
-        if (attachmentContent.type === 'image') {
-          images = [attachmentContent.content];
-          finalContent = `<hidden>${metaInfo}</hidden>${finalContent}`;
-        } else if (attachmentContent.type === 'text') {
-          finalContent = `<hidden>
+          if (attachmentContent.meta.type !== 'text' && attachmentContent.meta.type !== 'image') {
+            if (attachmentContent.type === 'image') {
+              images = [attachmentContent.content];
+              finalContent = `<hidden>${metaInfo}</hidden>${finalContent}`;
+            } else if (attachmentContent.type === 'text') {
+              finalContent = `<hidden>
 ${attachmentContent.content}
 ${metaInfo}
 </hidden>${content}`;
-        }
-      }
-
-      userMessageId = await this.addMessage(chatId, { role: 'user', content: finalContent }, attachmentContent);
-    } else {
-      userMessageId = await this.addMessage(chatId, { role: 'user', content: finalContent });
-    }
-
-    if (!userMessageId) return;
-
-    let thinkStartTime: number | null = null;
-    let isInThinkBlock = false;
-    let assistantMessageId: string | null = null;
-    let assistantContent = '';
-    let thinkTimeInterval: NodeJS.Timeout | null = null;
-
-    // Функция для обновления thinkTime в реальном времени
-    const startThinkTimeUpdates = () => {
-      if (thinkTimeInterval) clearInterval(thinkTimeInterval);
-      thinkTimeInterval = setInterval(async () => {
-        if (isInThinkBlock && thinkStartTime && assistantMessageId) {
-          const currentThinkTime = Date.now() - thinkStartTime;
-          await this.updateMessage(chatId, assistantMessageId, assistantContent, true, currentThinkTime, true);
-        }
-      }, 100); // Обновляем каждые 100 мс для плавности
-    };
-
-    // Очистка интервала при аборте
-    const cleanup = () => {
-      if (thinkTimeInterval) {
-        clearInterval(thinkTimeInterval);
-        thinkTimeInterval = null;
-      }
-      if (assistantMessageId && isInThinkBlock) {
-        isInThinkBlock = false;
-        const finalThinkTime = thinkStartTime ? Date.now() - thinkStartTime : undefined;
-        this.updateMessage(chatId, assistantMessageId, assistantContent, false, finalThinkTime, false);
-      }
-    };
-
-    this.abortController.signal.addEventListener('abort', cleanup);
-
-    if (images) {
-      const body = {
-        model: this.selectedModel,
-        prompt: finalContent,
-        images,
-        stream: true,
-      };
-
-      const response = await fetch(`${this.settings.ollamaLink}/api/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        signal: this.abortController.signal,
-      });
-
-      if (!response.body) throw new Error('No response body');
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n').filter(line => line.trim());
-
-        for (const line of lines) {
-          try {
-            const data = JSON.parse(line);
-            if (data.response) {
-              const chunkContent = data.response;
-
-              // Проверяем начало think-блока
-              if (chunkContent.includes('<think>') && !isInThinkBlock) {
-                thinkStartTime = Date.now();
-                isInThinkBlock = true;
-                startThinkTimeUpdates();
-              }
-
-              // Проверяем конец think-блока
-              if (chunkContent.includes('</think>') && isInThinkBlock) {
-                isInThinkBlock = false;
-                if (thinkTimeInterval) clearInterval(thinkTimeInterval);
-                thinkTimeInterval = null;
-              }
-
-              assistantMessageId ??= await this.addMessage(chatId, {
-                role: 'assistant',
-                content: '',
-                isLoading: true,
-                thinkTime: thinkStartTime && isInThinkBlock ? Date.now() - thinkStartTime : undefined,
-                isThinking: isInThinkBlock,
-              });
-              assistantContent += chunkContent;
-              await this.updateMessage(chatId, assistantMessageId!, assistantContent, true, thinkStartTime && isInThinkBlock ? Date.now() - thinkStartTime : undefined, isInThinkBlock);
             }
-          } catch (e) {
-            console.error('Error parsing chunk:', e);
+          }
+
+          userMessageId = await this.addMessage(chatId, { role: 'user', content: finalContent }, attachmentContent);
+        } else {
+          userMessageId = await this.addMessage(chatId, { role: 'user', content: finalContent });
+        }
+
+        if (!userMessageId) return;
+
+        let thinkStartTime: number | null = null;
+        let isInThinkBlock = false;
+        let assistantMessageId: string | null = null;
+        let assistantContent = '';
+        let thinkTimeInterval: number | null = null;
+
+        const startThinkTimeUpdates = () => {
+          if (thinkTimeInterval) clearInterval(thinkTimeInterval);
+          thinkTimeInterval = setInterval(async () => {
+            if (isInThinkBlock && thinkStartTime && assistantMessageId) {
+              const currentThinkTime = Date.now() - thinkStartTime;
+              await this.updateMessage(chatId, assistantMessageId, assistantContent, true, currentThinkTime, true);
+            }
+          }, 100);
+        };
+
+        const cleanup = () => {
+          if (thinkTimeInterval) {
+            clearInterval(thinkTimeInterval);
+            thinkTimeInterval = null;
+          }
+          if (assistantMessageId && isInThinkBlock) {
+            isInThinkBlock = false;
+            const finalThinkTime = thinkStartTime ? Date.now() - thinkStartTime : undefined;
+            this.updateMessage(chatId, assistantMessageId, assistantContent, false, finalThinkTime, false);
+          }
+        };
+
+        this.abortController.signal.addEventListener('abort', cleanup);
+
+        if (images) {
+          const body = {
+            model: this.selectedModel,
+            prompt: finalContent,
+            images,
+            stream: true,
+          };
+
+          const response = await fetch(`${this.settings.ollamaLink}/api/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            signal: this.abortController.signal,
+          });
+
+          if (!response.body) throw new Error('No response body');
+
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n').filter(line => line.trim());
+
+            for (const line of lines) {
+              try {
+                const data = JSON.parse(line);
+                if (data.response) {
+                  const chunkContent = data.response;
+
+                  // Проверяем начало think-блока
+                  if (chunkContent.includes('<think>') && !isInThinkBlock) {
+                    thinkStartTime = Date.now();
+                    isInThinkBlock = true;
+                    startThinkTimeUpdates();
+                  }
+
+                  // Проверяем конец think-блока
+                  if (chunkContent.includes('</think>') && isInThinkBlock) {
+                    isInThinkBlock = false;
+                    if (thinkTimeInterval) clearInterval(thinkTimeInterval);
+                    thinkTimeInterval = null;
+                  }
+
+                  assistantMessageId ??= await this.addMessage(chatId, {
+                    role: 'assistant',
+                    content: '',
+                    isLoading: true,
+                    thinkTime: thinkStartTime && isInThinkBlock ? Date.now() - thinkStartTime : undefined,
+                    isThinking: isInThinkBlock,
+                  });
+                  assistantContent += chunkContent;
+                  await this.updateMessage(chatId, assistantMessageId!, assistantContent, true, thinkStartTime && isInThinkBlock ? Date.now() - thinkStartTime : undefined, isInThinkBlock);
+                }
+              } catch (e) {
+                console.error('Error parsing chunk:', e);
+              }
+            }
+          }
+
+          if (assistantMessageId) {
+            const message = this.getMessage(chatId, assistantMessageId);
+            if (message) {
+              const finalThinkTime = isInThinkBlock && thinkStartTime ? Date.now() - thinkStartTime : message.thinkTime;
+              if (thinkTimeInterval) clearInterval(thinkTimeInterval);
+              thinkTimeInterval = null;
+              await this.updateMessage(chatId, assistantMessageId, message.content, false, finalThinkTime, false);
+            }
+          }
+        } else {
+          const body = {
+            model: this.selectedModel,
+            messages: chat.messages.map(msg => ({
+              role: msg.role,
+              content: msg.content,
+              ...(msg.attachmentContent && msg.attachmentMeta?.type === 'image' ? { images: [msg.attachmentContent] } : {})
+            })),
+            stream: true,
+          };
+
+          const response = await fetch(`${this.settings.ollamaLink}/api/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            signal: this.abortController.signal,
+          });
+
+          if (!response.body) throw new Error('No response body');
+
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n').filter(line => line.trim());
+
+            for (const line of lines) {
+              try {
+                const data = JSON.parse(line);
+                if (data.message?.role === 'assistant' && data.message.content) {
+                  const chunkContent = data.message.content;
+
+                  // Проверяем начало think-блока
+                  if (chunkContent.includes('<think>') && !isInThinkBlock) {
+                    thinkStartTime = Date.now();
+                    isInThinkBlock = true;
+                    startThinkTimeUpdates();
+                  }
+
+                  // Проверяем конец think-блока
+                  if (chunkContent.includes('</think>') && isInThinkBlock) {
+                    isInThinkBlock = false;
+                    if (thinkTimeInterval) clearInterval(thinkTimeInterval);
+                    thinkTimeInterval = null;
+                  }
+
+                  assistantMessageId ??= await this.addMessage(chatId, {
+                    role: 'assistant',
+                    content: '',
+                    isLoading: true,
+                    thinkTime: thinkStartTime && isInThinkBlock ? Date.now() - thinkStartTime : undefined,
+                    isThinking: isInThinkBlock,
+                  });
+                  assistantContent += chunkContent;
+                  await this.updateMessage(chatId, assistantMessageId!, assistantContent, true, thinkStartTime && isInThinkBlock ? Date.now() - thinkStartTime : undefined, isInThinkBlock);
+                }
+              } catch (e) {
+                console.error('Error parsing chunk:', e);
+              }
+            }
+          }
+
+          if (assistantMessageId) {
+            const message = this.getMessage(chatId, assistantMessageId);
+            if (message) {
+              const finalThinkTime = isInThinkBlock && thinkStartTime ? Date.now() - thinkStartTime : message.thinkTime;
+              if (thinkTimeInterval) clearInterval(thinkTimeInterval);
+              thinkTimeInterval = null;
+              await this.updateMessage(chatId, assistantMessageId, message.content, false, finalThinkTime, false);
+            }
           }
         }
-      }
 
-      if (assistantMessageId) {
-        const message = this.getMessage(chatId, assistantMessageId);
-        if (message) {
-          const finalThinkTime = isInThinkBlock && thinkStartTime ? Date.now() - thinkStartTime : message.thinkTime;
-          if (thinkTimeInterval) clearInterval(thinkTimeInterval);
-          thinkTimeInterval = null;
-          await this.updateMessage(chatId, assistantMessageId, message.content, false, finalThinkTime, false);
+        if (this.activeChat && this.shouldGenerateTitle(this.activeChat)) {
+          this.isGeneratingTitle = true;
+          await this.generateChatTitle(chatId);
+          this.isGeneratingTitle = false;
         }
-      }
-    } else {
-      const body = {
-        model: this.selectedModel,
-        messages: chat.messages.map(msg => ({
-          role: msg.role,
-          content: msg.content,
-          ...(msg.attachmentContent && msg.attachmentMeta?.type === 'image' ? { images: [msg.attachmentContent] } : {})
-        })),
-        stream: true,
-      };
-
-      const response = await fetch(`${this.settings.ollamaLink}/api/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        signal: this.abortController.signal,
-      });
-
-      if (!response.body) throw new Error('No response body');
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n').filter(line => line.trim());
-
-        for (const line of lines) {
-          try {
-            const data = JSON.parse(line);
-            if (data.message?.role === 'assistant' && data.message.content) {
-              const chunkContent = data.message.content;
-
-              // Проверяем начало think-блока
-              if (chunkContent.includes('<think>') && !isInThinkBlock) {
-                thinkStartTime = Date.now();
-                isInThinkBlock = true;
-                startThinkTimeUpdates();
-              }
-
-              // Проверяем конец think-блока
-              if (chunkContent.includes('</think>') && isInThinkBlock) {
-                isInThinkBlock = false;
-                if (thinkTimeInterval) clearInterval(thinkTimeInterval);
-                thinkTimeInterval = null;
-              }
-
-              assistantMessageId ??= await this.addMessage(chatId, {
-                role: 'assistant',
-                content: '',
-                isLoading: true,
-                thinkTime: thinkStartTime && isInThinkBlock ? Date.now() - thinkStartTime : undefined,
-                isThinking: isInThinkBlock,
-              });
-              assistantContent += chunkContent;
-              await this.updateMessage(chatId, assistantMessageId!, assistantContent, true, thinkStartTime && isInThinkBlock ? Date.now() - thinkStartTime : undefined, isInThinkBlock);
-            }
-          } catch (e) {
-            console.error('Error parsing chunk:', e);
-          }
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          console.log('Request aborted');
+        } else {
+          console.error('Failed to stream message from Ollama:', error);
+          throw error;
         }
+      } finally {
+        this.abortController = null;
       }
-
-      if (assistantMessageId) {
-        const message = this.getMessage(chatId, assistantMessageId);
-        if (message) {
-          const finalThinkTime = isInThinkBlock && thinkStartTime ? Date.now() - thinkStartTime : message.thinkTime;
-          if (thinkTimeInterval) clearInterval(thinkTimeInterval);
-          thinkTimeInterval = null;
-          await this.updateMessage(chatId, assistantMessageId, message.content, false, finalThinkTime, false);
-        }
-      }
-    }
-
-    if (this.activeChat && this.shouldGenerateTitle(this.activeChat)) {
-      this.isGeneratingTitle = true;
-      await this.generateChatTitle(chatId);
-      this.isGeneratingTitle = false;
-    }
-  } catch (error: any) {
-    if (error.name === 'AbortError') {
-      console.log('Request aborted');
-    } else {
-      console.error('Failed to stream message from Ollama:', error);
-      throw error;
-    }
-  } finally {
-    this.abortController = null;
-  }
-},
+    },
 
     async editMessage(
       chatId: string,
