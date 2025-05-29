@@ -6,7 +6,7 @@ import {useSettingsStore} from "@/stores/settings.ts";
 
 const chat = useChatStore();
 const { settings, updateSettings } = useSettingsStore();
-const textareaRef = ref<HTMLInputElement>();
+const textareaRef = ref<HTMLTextAreaElement>();
 const fileInputRef = ref<HTMLInputElement>();
 const activeChat = computed(() => chat.activeChat);
 const activeChatId = computed(() => chat.activeChatId);
@@ -83,7 +83,7 @@ function handleFilesSelected(event: Event) {
           meta: {
             name: file.name,
             size: file.size,
-            type: isImage ? 'image' : 'text',
+            type: 'image',
             lastModified: file.lastModified,
           },
         };
@@ -92,7 +92,7 @@ function handleFilesSelected(event: Event) {
       attachmentContent.value = { content: result, type: 'text', meta: {
             name: file.name,
             size: file.size,
-            type: isImage ? 'image' : 'text',
+            type: 'text',
             lastModified: file.lastModified,
           }
       };

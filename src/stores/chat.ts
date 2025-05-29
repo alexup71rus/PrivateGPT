@@ -243,16 +243,14 @@ export const useChatStore = defineStore('chat', {
           const file = attachmentContent.meta;
           const metaInfo = `[Attached: ${file.name}, ${file.size} bytes, modified ${new Date(file.lastModified).toLocaleDateString()}]`;
 
-          if (attachmentContent.meta.type !== 'text' && attachmentContent.meta.type !== 'image') {
-            if (attachmentContent.type === 'image') {
-              images = [attachmentContent.content];
-              finalContent = `<hidden>${metaInfo}</hidden>${finalContent}`;
-            } else if (attachmentContent.type === 'text') {
-              finalContent = `<hidden>
+          if (attachmentContent.type === 'image') {
+            images = [attachmentContent.content];
+            finalContent = `<hidden>${metaInfo}</hidden>${finalContent}`;
+          } else if (attachmentContent.type === 'text') {
+            finalContent = `<hidden>
 ${attachmentContent.content}
 ${metaInfo}
 </hidden>${content}`;
-            }
           }
 
           userMessageId = await this.addMessage(chatId, { role: 'user', content: finalContent }, attachmentContent);

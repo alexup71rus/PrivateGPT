@@ -144,7 +144,11 @@ const saveSummary = async () => {
 
 <template>
   <div ref="bubbleRef" :class="message.role" class="message-bubble">
-    <AttachmentChip v-if="message.attachmentMeta" :meta="message.attachmentMeta" />
+    <AttachmentChip
+      v-if="message.attachmentMeta"
+      :meta="message.attachmentMeta"
+      :content="message.attachmentContent || ''"
+    />
     <ThinkPreview v-if="message.thinkTime !== undefined" :message="message" />
     <div class="content" v-html="parsedContent" />
     <div v-if="false" class="attachments-scroll">
