@@ -217,6 +217,7 @@ onMounted(initializeChat);
   flex-direction: row;
   justify-content: space-between;
   width: 100%;
+  z-index: 1;
 }
 
 .sidebar.sidebar--opened {

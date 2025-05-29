@@ -417,12 +417,12 @@ watch(() => props.message.content, async () => {
 
   &::before {
     top: 5px;
-    background: linear-gradient(to bottom, rgb(var(--v-theme-background)), transparent);
+    background: linear-gradient(to bottom, rgb(var(--v-theme-surface)), transparent);
   }
 
   &::after {
     bottom: 0;
-    background: linear-gradient(to top, rgb(var(--v-theme-background)), transparent);
+    background: linear-gradient(to top, rgb(var(--v-theme-surface)), transparent);
   }
 }
 
@@ -437,6 +437,10 @@ watch(() => props.message.content, async () => {
     overflow: hidden;
     position: relative;
   }
+}
+
+.think-preview + .content {
+  margin-top: 10px;
 }
 
 </style>
