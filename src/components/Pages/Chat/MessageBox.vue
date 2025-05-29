@@ -1,11 +1,11 @@
 <script lang="ts" setup>
 import {computed, nextTick, onMounted, ref, watch} from "vue";
 import {useChatStore} from "@/stores/chat.ts";
-import {useAppSettings} from "@/composables/useAppSettings.ts";
 import type {ChatModel} from "@/types/chats.ts";
+import {useSettingsStore} from "@/stores/settings.ts";
 
 const chat = useChatStore();
-const { settings, updateSettings } = useAppSettings();
+const { settings, updateSettings } = useSettingsStore();
 const textareaRef = ref<HTMLInputElement>();
 const fileInputRef = ref<HTMLInputElement>();
 const activeChat = computed(() => chat.activeChat);
@@ -17,7 +17,7 @@ const isSearch = ref(settings.isSearchAsDefault);
 const canSend = computed(() => chat.isSending ? false : messageText.value.trim());
 
 const modelNames = computed(() => chat.models?.map((model: ChatModel) => model.name) || []);
-const selectedModel = ref(settings.defaultModel);
+const selectedModel = ref(settings.selectedModel || settings.defaultModel);
 const isChangedModel = computed(() => selectedModel.value !== settings.defaultModel);
 const setDefaultModel = () => {
   if (selectedModel.value) {
@@ -34,6 +34,7 @@ const filteredModels = computed(() =>
 
 function selectModel(model: string) {
   selectedModel.value = model;
+  updateSettings({ selectedModel: selectedModel.value });
 }
 
 function handleAttachClick() {
@@ -196,6 +197,14 @@ watch(() => [chat.activeChatId, chat.isSending, chat.selectedModel], (newVal, ol
           </v-card-text>
         </v-card>
       </v-menu>
+      <v-btn
+        v-if="isChangedModel"
+        :color="'red'"
+        class="model-btn"
+        variant="tonal"
+        icon="mdi-backup-restore"
+        @click="selectModel(settings.defaultModel)"
+      />
       <v-spacer />
       <v-btn
         :color="attachment ? 'blue' : 'white'"
@@ -293,6 +302,7 @@ watch(() => [chat.activeChatId, chat.isSending, chat.selectedModel], (newVal, ol
   .v-btn--icon.v-btn--density-default {
     width: var(--v-btn-height);
     height: var(--v-btn-height);
+    padding: 0 4px 0 4px;
   }
 
   ::v-deep(.v-btn__prepend) {

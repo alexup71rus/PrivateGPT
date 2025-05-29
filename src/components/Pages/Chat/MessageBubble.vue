@@ -2,7 +2,7 @@
 import type {Attachment, Message} from "@/types/chats.ts";
 import {useChatStore} from "@/stores/chat.ts";
 import {useAlert} from "@/plugins/alertPlugin.ts";
-import {computed, onMounted, ref} from "vue";
+import {computed, nextTick, onMounted, ref, watch} from "vue";
 import "highlight.js/styles/default.css";
 import {parseMarkdown, wrapThinkBlocks} from "@/utils/markdown.ts";
 import {useCopyCode} from "@/composables/useCopyCode.ts";
@@ -16,6 +16,8 @@ const { showSnackbar } = useAlert();
 const bubbleRef = ref();
 const isEditDialogOpen = ref(false);
 const editedContent = ref("");
+const expandedPanel = ref<number[] | number | null>(null);
+const thinkPreviewRef = ref<HTMLElement>();
 
 const formatFileSize = computed(() => (size: number | undefined) => {
   if (!size) return '';
@@ -65,7 +67,6 @@ const saveEditedMessage = async (makeResend = false) => {
     return;
   }
 
-  // Сохраняем изменения
   await chat.editMessage(chat.activeChatId, props.message.id, editedContent.value);
   showSnackbar({ message: "Сообщение обновлено", type: "success" });
 
@@ -173,6 +174,14 @@ const saveSummary = async () => {
     }
   }
 };
+
+watch(() => props.message.content, async () => {
+  await nextTick();
+  thinkPreviewRef.value?.scrollTo({
+    top: thinkPreviewRef.value.scrollHeight - 55,
+    behavior: 'smooth'
+  });
+});
 </script>
 
 <template>
@@ -183,15 +192,28 @@ const saveSummary = async () => {
     >
       {{ message.attachmentMeta.name }} [{{ formatFileSize(message.attachmentMeta.size) }}]
     </v-chip>
-    <v-expansion-panels class="think" v-if="message.thinkTime !== undefined">
-      <v-expansion-panel
-        :title="message.isThinking ? `Размышляю... (${formatThinkTime(message.thinkTime ?? 0)})` : `Размышлял в течение: ${formatThinkTime(message.thinkTime ?? 0)}`"
-      >
-        <v-expansion-panel-text>
-          <v-card v-html="parsedThinkContent" />
-        </v-expansion-panel-text>
-      </v-expansion-panel>
-    </v-expansion-panels>
+    <div v-if="message.thinkTime !== undefined" class="think-preview">
+      <v-expansion-panels v-model="expandedPanel">
+        <v-expansion-panel
+          :title="message.isThinking ? `Размышляю... (${formatThinkTime(message.thinkTime ?? 0)})` : `Размышлял в течение: ${formatThinkTime(message.thinkTime ?? 0)}`"
+        >
+          <v-expansion-panel-text>
+            <v-card variant="tonal" v-html="parsedThinkContent" />
+          </v-expansion-panel-text>
+        </v-expansion-panel>
+      </v-expansion-panels>
+      <v-expand-transition>
+        <v-card
+          v-if="message.isThinking && (expandedPanel === null || expandedPanel === undefined)"
+          class="preview"
+          variant="elevated"
+        >
+          <template v-slot:text>
+            <div class="preview__content" ref="thinkPreviewRef" v-html="parsedThinkContent"></div>
+          </template>
+        </v-card>
+      </v-expand-transition>
+    </div>
     <div class="content" v-html="parsedContent" />
     <div v-if="false" class="attachments-scroll">
       <div class="attachment" />
@@ -379,6 +401,42 @@ const saveSummary = async () => {
 
 .think {
   margin-bottom: 10px;
+}
+
+.think-preview > .v-card {
+  &::before,
+  &::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 3rem;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  &::before {
+    top: 5px;
+    background: linear-gradient(to bottom, rgb(var(--v-theme-background)), transparent);
+  }
+
+  &::after {
+    bottom: 0;
+    background: linear-gradient(to top, rgb(var(--v-theme-background)), transparent);
+  }
+}
+
+.think-preview .preview {
+  transform: translateY(-5px);
+  position: relative;
+  color: rgb(var(--v-theme-on-background));
+  transition: 0.2s;
+
+  &__content {
+    height: 3rem;
+    overflow: hidden;
+    position: relative;
+  }
 }
 
 </style>

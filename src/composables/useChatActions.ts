@@ -1,11 +1,11 @@
 import {useChatStore} from '@/stores/chat';
 import type {Chat} from "@/types/chats.ts";
-import {useAppSettings} from "@/composables/useAppSettings.ts";
 import {useAppRouting} from "@/composables/useAppRouting.ts";
+import {useSettingsStore} from "@/stores/settings.ts";
 
 export function useChatActions() {
   const chat = useChatStore();
-  const { settings } = useAppSettings();
+  const { settings } = useSettingsStore();
   const { currentChatId, navigateWithHash } = useAppRouting();
 
   const onNewChat = async () => {

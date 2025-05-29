@@ -1,12 +1,12 @@
 import {defineStore} from 'pinia';
 import {useHttpService} from "@/plugins/httpPlugin";
-import {useAppSettings} from "@/composables/useAppSettings.ts";
 import type {ISettings} from "@/types/settings.ts";
+import {useSettingsStore} from "@/stores/settings.ts";
 
 export const useAppStore = defineStore('app', {
   state: () => {
     const { http } = useHttpService();
-    const { settings, updateSettings } = useAppSettings();
+    const { settings, updateSettings } = useSettingsStore();
 
     return {
       http,

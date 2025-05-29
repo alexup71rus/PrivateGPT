@@ -1,7 +1,6 @@
 <script lang="ts" setup>
 import {useChatStore} from "@/stores/chat.ts";
 import {computed, onMounted, ref} from "vue";
-import {useAppSettings} from "@/composables/useAppSettings.ts";
 import {useRouter} from "vue-router";
 import {useChatActions} from "@/composables/useChatActions.ts";
 import {useAppStore} from "@/stores/app.ts";
@@ -15,7 +14,6 @@ const props = defineProps<{
 const router = useRouter();
 const app = useAppStore();
 const chat = useChatStore();
-const { settings } = useAppSettings();
 const { showSnackbar, showConfirm } = useAlert();
 const { onNewChat, selectChat, deleteChat } = useChatActions();
 const { handleFirstClick, handleSecondClick, resetDeletePending, isPending } = useDeleteButton(deleteChat);

@@ -3,9 +3,9 @@ import {useHttpService} from '@/plugins/httpPlugin';
 import type {OllamaModel, OllamaTagsResponse} from '@/types/ollama.ts';
 import type {Attachment, AttachmentMeta, Chat, MemoryEntry, Message} from '@/types/chats.ts';
 import {throttle} from '@/utils/helpers.ts';
-import {useAppSettings} from '@/composables/useAppSettings.ts';
 import type {ISettings} from '@/types/settings.ts';
 import {clearAllChats, deleteChat, loadChats, loadMemory, saveChat, saveMemory} from '@/utils/storage.ts';
+import {useSettingsStore} from "@/stores/settings.ts";
 
 const throttledSaveChat = throttle(async (chat: Chat) => {
   await saveChat(chat);
@@ -14,8 +14,9 @@ const throttledSaveChat = throttle(async (chat: Chat) => {
 export const useChatStore = defineStore('chat', {
   state: () => {
     const { http } = useHttpService();
-    const { settings } = useAppSettings();
+    const { settings } = useSettingsStore();
 
+    console.log(settings)
     return {
       http,
       settings: settings as ISettings,

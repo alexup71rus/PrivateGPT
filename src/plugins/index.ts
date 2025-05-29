@@ -13,6 +13,7 @@ import httpPlugin from "@/plugins/httpPlugin.ts";
 
 // Types
 import type { App } from 'vue'
+import createSettingsPlugin from "@/plugins/settingsPlugin.ts";
 
 export function registerPlugins (app: App) {
   app
@@ -20,5 +21,6 @@ export function registerPlugins (app: App) {
     .use(router)
     .use(pinia)
     .use(createAlertPlugin())
+    .use(createSettingsPlugin())
     .use(httpPlugin)
 }
