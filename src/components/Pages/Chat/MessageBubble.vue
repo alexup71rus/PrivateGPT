@@ -1,11 +1,14 @@
 <script lang="ts" setup>
-import type {Attachment, AttachmentMeta, Message} from "@/types/chats.ts";
-import {useChatStore} from "@/stores/chat.ts";
-import {useAlert} from "@/plugins/alertPlugin.ts";
-import {computed, nextTick, onMounted, ref, watch} from "vue";
-import "highlight.js/styles/default.css";
-import {parseMarkdown} from "@/utils/markdown.ts";
-import {useCopyCode} from "@/composables/useCopyCode.ts";
+import type { Attachment, AttachmentMeta, Message } from '@/types/chats';
+import { useChatStore } from '@/stores/chat';
+import { useAlert } from '@/plugins/alertPlugin';
+import { computed, onMounted, ref } from 'vue';
+import 'highlight.js/styles/default.css';
+import { parseMarkdown } from '@/utils/markdown';
+import { useCopyCode } from '@/composables/useCopyCode';
+import { copyToClipboard } from '@/utils/chatUtils';
+import AttachmentChip from '@/components/Pages/Chat/AttachmentChip.vue';
+import ThinkPreview from '@/components/Pages/Chat/ThinkPreview.vue';
 
 const props = defineProps<{
   message: Message;
@@ -15,45 +18,15 @@ const chat = useChatStore();
 const { showSnackbar } = useAlert();
 const bubbleRef = ref();
 const isEditDialogOpen = ref(false);
-const editedContent = ref("");
-const expandedPanel = ref<number[] | number | null>(null);
-const thinkPreviewRef = ref<HTMLElement>();
-
-const formatFileSize = computed(() => (size: number | undefined) => {
-  if (!size) return '';
-  if (size < 1024) return `${size} Б`;
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} КБ`;
-  return `${(size / 1024 / 1024).toFixed(2)} МБ`;
-});
+const editedContent = ref('');
 
 useCopyCode(bubbleRef, showSnackbar);
 
-const parsedThinkContent = computed(() => {
-  return parseMarkdown(props.message.content, true);
-});
-const parsedContent = computed(() => {
-  return parseMarkdown(props.message.content);
-});
-const formatThinkTime = (milliseconds: number) => {
-  if (milliseconds < 1000) return `${milliseconds} мс`;
-  return `${(milliseconds / 1000).toFixed(1)} сек`;
-};
-
-const copyMessage = async () => {
-  console.log(props.message)
-  await navigator.clipboard.writeText(props.message.content);
-  showSnackbar({
-    message: 'Скопировано!',
-    type: 'success',
-  });
-};
+const parsedContent = computed(() => parseMarkdown(props.message.content));
 
 const copyCodeBlock = async (code: string) => {
   await navigator.clipboard.writeText(code);
-  showSnackbar({
-    message: 'Код скопирован!',
-    type: 'success',
-  });
+  showSnackbar({ message: 'Код скопирован!', type: 'success' });
 };
 
 const openEditDialog = () => {
@@ -63,12 +36,12 @@ const openEditDialog = () => {
 
 const saveEditedMessage = async (makeResend = false) => {
   if (!editedContent.value.trim()) {
-    showSnackbar({ message: "Текст не может быть пустым", type: "warning" });
+    showSnackbar({ message: 'Текст не может быть пустым', type: 'warning' });
     return;
   }
 
   await chat.editMessage(chat.activeChatId, props.message.id, editedContent.value);
-  showSnackbar({ message: "Сообщение обновлено", type: "success" });
+  showSnackbar({ message: 'Сообщение обновлено', type: 'success' });
 
   if (!makeResend) {
     isEditDialogOpen.value = false;
@@ -90,11 +63,9 @@ const saveEditedMessage = async (makeResend = false) => {
     await chat.sendMessage(
       chat.activeChatId,
       editedContent.value,
-      props.message.attachmentContent ? {
-        content: props.message.attachmentContent,
-        type: props.message.attachmentMeta?.type || 'text',
-        meta: props.message.attachmentMeta as AttachmentMeta
-      } as Attachment : null
+      props.message.attachmentContent
+        ? { content: props.message.attachmentContent, type: props.message.attachmentMeta?.type || 'text', meta: props.message.attachmentMeta as AttachmentMeta } as Attachment
+        : null
     );
   } else {
     if (index === 0) return;
@@ -105,11 +76,9 @@ const saveEditedMessage = async (makeResend = false) => {
     await chat.sendMessage(
       chat.activeChatId,
       prevMessage.content,
-      prevMessage.attachmentContent ? {
-        content: prevMessage.attachmentContent,
-        type: prevMessage.attachmentMeta?.type || 'text',
-        meta: prevMessage.attachmentMeta as AttachmentMeta
-      } as Attachment : null
+      prevMessage.attachmentContent
+        ? { content: prevMessage.attachmentContent, type: prevMessage.attachmentMeta?.type || 'text', meta: prevMessage.attachmentMeta as AttachmentMeta } as Attachment
+        : null
     );
   }
 
@@ -121,7 +90,7 @@ const closeEditDialog = () => {
   isEditDialogOpen.value = false;
 };
 
-onMounted(async () => {
+onMounted(() => {
   bubbleRef.value.addEventListener('click', async (ev: MouseEvent) => {
     const target = ev.target as HTMLElement;
 
@@ -130,7 +99,6 @@ onMounted(async () => {
 
       if (block) {
         const codeElement = block.querySelector('code');
-
         if (codeElement) {
           const code = codeElement.innerText.replace(/^\d+\s+/gm, '');
           await copyCodeBlock(code);
@@ -163,57 +131,21 @@ const saveSummary = async () => {
   if (chatId) {
     try {
       const result = await chat.saveSummary(chatId, props.message.id);
-
-      if (result) {
-        showSnackbar({ message: 'Память обновлена: ' + result, type: 'success' });
-      } else {
-        showSnackbar({ message: 'Нечего сохранять', type: 'warning' });
-      }
+      showSnackbar({
+        message: result ? 'Память обновлена: ' + result : 'Нечего сохранять',
+        type: result ? 'success' : 'warning',
+      });
     } catch (error) {
       showSnackbar({ message: 'Ошибка при сохранении саммари', type: 'error' });
     }
   }
 };
-
-watch(() => props.message.content, async () => {
-  await nextTick();
-  thinkPreviewRef.value?.scrollTo({
-    top: thinkPreviewRef.value.scrollHeight - 55,
-    behavior: 'smooth'
-  });
-});
 </script>
 
 <template>
   <div ref="bubbleRef" :class="message.role" class="message-bubble">
-    <v-chip
-      v-if="message.attachmentMeta"
-      :prepend-icon="message.attachmentMeta?.type === 'text' ? 'mdi-file-document' : 'mdi-file-image'"
-    >
-      {{ message.attachmentMeta.name }} [{{ formatFileSize(message.attachmentMeta.size) }}]
-    </v-chip>
-    <div v-if="message.thinkTime !== undefined" class="think-preview">
-      <v-expansion-panels v-model="expandedPanel">
-        <v-expansion-panel
-          :title="message.isThinking ? `Размышляю... (${formatThinkTime(message.thinkTime ?? 0)})` : `Размышлял в течение: ${formatThinkTime(message.thinkTime ?? 0)}`"
-        >
-          <v-expansion-panel-text>
-            <v-card variant="tonal" v-html="parsedThinkContent" />
-          </v-expansion-panel-text>
-        </v-expansion-panel>
-      </v-expansion-panels>
-      <v-expand-transition>
-        <v-card
-          v-if="message.isThinking && (expandedPanel === null || expandedPanel === undefined)"
-          class="preview"
-          variant="elevated"
-        >
-          <template v-slot:text>
-            <div class="preview__content" ref="thinkPreviewRef" v-html="parsedThinkContent"></div>
-          </template>
-        </v-card>
-      </v-expand-transition>
-    </div>
+    <AttachmentChip v-if="message.attachmentMeta" :meta="message.attachmentMeta" />
+    <ThinkPreview v-if="message.thinkTime !== undefined" :message="message" />
     <div class="content" v-html="parsedContent" />
     <div v-if="false" class="attachments-scroll">
       <div class="attachment" />
@@ -223,7 +155,7 @@ watch(() => props.message.content, async () => {
     v-if="message.role === 'user'"
     :class="['actions', 'actions--user', { disabled: message.isLoading }]"
   >
-    <v-btn icon="mdi-content-copy" size="small" variant="text" @click="copyMessage" />
+    <v-btn icon="mdi-content-copy" size="small" variant="text" @click="copyToClipboard(message.content)" />
     <v-btn icon="mdi-pencil" size="small" variant="text" @click="openEditDialog" />
     <v-btn
       color="red"
@@ -236,7 +168,7 @@ watch(() => props.message.content, async () => {
   <div v-else :class="['actions', { disabled: message.isLoading }]">
     <v-btn icon="mdi-pencil" size="small" variant="text" @click="openEditDialog" />
     <v-btn icon="mdi-autorenew" size="small" variant="text" @click="regenerateMessage" />
-    <v-btn icon="mdi-content-copy" size="small" variant="text" @click="copyMessage" />
+    <v-btn icon="mdi-content-copy" size="small" variant="text" @click="copyToClipboard(message.content)" />
     <v-btn
       icon="mdi-content-save"
       size="small"
@@ -398,49 +330,4 @@ watch(() => props.message.content, async () => {
   max-height: 300px;
   overflow: auto;
 }
-
-.think {
-  margin-bottom: 10px;
-}
-
-.think-preview > .v-card {
-  &::before,
-  &::after {
-    content: '';
-    position: absolute;
-    left: 0;
-    right: 0;
-    height: 3rem;
-    pointer-events: none;
-    z-index: 1;
-  }
-
-  &::before {
-    top: 5px;
-    background: linear-gradient(to bottom, rgb(var(--v-theme-surface)), transparent);
-  }
-
-  &::after {
-    bottom: 0;
-    background: linear-gradient(to top, rgb(var(--v-theme-surface)), transparent);
-  }
-}
-
-.think-preview .preview {
-  transform: translateY(-5px);
-  position: relative;
-  color: rgb(var(--v-theme-on-background));
-  transition: 0.2s;
-
-  &__content {
-    height: 3rem;
-    overflow: hidden;
-    position: relative;
-  }
-}
-
-.think-preview + .content {
-  margin-top: 10px;
-}
-
 </style>

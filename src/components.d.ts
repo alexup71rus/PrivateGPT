@@ -9,11 +9,13 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     AlertProvider: typeof import('./components/Providers/AlertProvider.vue')['default']
+    AttachmentChip: typeof import('./components/Pages/Chat/AttachmentChip.vue')['default']
     General: typeof import('./components/Pages/Settings/General.vue')['default']
     MessageBox: typeof import('./components/Pages/Chat/MessageBox.vue')['default']
     MessageBubble: typeof import('./components/Pages/Chat/MessageBubble.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     SidebarLayout: typeof import('./components/Outline/SidebarLayout.vue')['default']
+    ThinkPreview: typeof import('./components/Pages/Chat/ThinkPreview.vue')['default']
   }
 }

@@ -16,7 +16,6 @@ export const useChatStore = defineStore('chat', {
     const { http } = useHttpService();
     const { settings } = useSettingsStore();
 
-    console.log(settings)
     return {
       http,
       settings: settings as ISettings,
