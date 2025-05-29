@@ -239,7 +239,7 @@ export const useChatStore = defineStore('chat', {
         let images: string[] | undefined;
         let userMessageId: string | null;
 
-        if (attachmentContent) {
+        if (attachmentContent && Object.keys(attachmentContent).length) {
           const file = attachmentContent.meta;
           const metaInfo = `[Attached: ${file.name}, ${file.size} bytes, modified ${new Date(file.lastModified).toLocaleDateString()}]`;
 
