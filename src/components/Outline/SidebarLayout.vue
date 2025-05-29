@@ -92,7 +92,7 @@ onMounted(initializeChat);
     </div>
 
     <transition name="fade">
-      <div v-if="app.isAsideOpen && isChatPage" class="chat-list">
+      <div v-if="app.isAsideOpen && isChatPage" class="chats-container">
         <v-text-field
           v-model="searchQuery"
           label="Поиск"
@@ -110,21 +110,24 @@ onMounted(initializeChat);
             />
           </template>
         </v-text-field>
-        <div
-          v-for="_chat in filteredChats"
-          :key="_chat.id"
-          :class="['chat-item', { 'chat-item--selected': chat.activeChatId === _chat.id }]"
-          @click="handleChatClick(_chat.id)"
-        >
-          <span>{{ _chat.title }}</span>
-          <v-btn
-            class="delete-btn"
-            :color="isPending(_chat.id) ? 'red' : ''"
-            icon="mdi-delete"
-            size="small"
-            @click.stop="isPending(_chat.id) ? handleSecondClick(_chat.id) : handleFirstClick(_chat.id)"
-            @mouseleave="resetDeletePending"
-          />
+
+        <div class="chat-list">
+          <div
+            v-for="_chat in filteredChats"
+            :key="_chat.id"
+            :class="['chat-item', { 'chat-item--selected': chat.activeChatId === _chat.id }]"
+            @click="handleChatClick(_chat.id)"
+          >
+            <span>{{ _chat.title }}</span>
+            <v-btn
+              class="delete-btn"
+              :color="isPending(_chat.id) ? 'red' : ''"
+              icon="mdi-delete"
+              size="small"
+              @click.stop="isPending(_chat.id) ? handleSecondClick(_chat.id) : handleFirstClick(_chat.id)"
+              @mouseleave="resetDeletePending"
+            />
+          </div>
         </div>
       </div>
     </transition>
@@ -231,14 +234,24 @@ onMounted(initializeChat);
   margin-top: auto;
 }
 
+.chats-container {
+  margin: 30px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+  min-height: 0;
+}
+
 .chat-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding-top: 6px;
-  margin-top: 30px;
-  max-height: 400px;
+  height: calc(100vh - 234px);
   overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .chat-item {
