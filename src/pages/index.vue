@@ -1,15 +1,19 @@
 <script lang="ts" setup>
-import {computed, ref, watch} from "vue";
-import {useChatStore} from "@/stores/chat.ts";
-import {useChatScroll} from "@/composables/useChatScroll.ts";
-import {useAppStore} from "@/stores/app.ts";
+import { computed, ref, watch } from "vue";
+import { useChatStore } from "@/stores/chat.ts";
+import { useChatScroll } from "@/composables/useChatScroll.ts";
+import { useAppStore } from "@/stores/app.ts";
+import { useSettingsStore } from "@/stores/settings.ts";
 
 const app = useAppStore();
 const chat = useChatStore();
+const settings = useSettingsStore();
 const chatTitle = ref(chat.activeChat?.title ?? '');
 const messages = computed(() => chat.activeChat?.messages ?? []);
-const { chatMessagesRef, isShowScrollDown, scrollDown } = useChatScroll(messages);
-const isLoading = computed(() => chat.activeChat?.messages[chat.activeChat.messages.length - 1]?.role === 'user' && chat.isSending);
+const isLoading = computed(() =>
+  chat.activeChat?.messages[chat.activeChat.messages.length - 1]?.role === 'user' && chat.isSending
+);
+const { chatMessagesRef, chatGap, isShowScrollDown, scrollDown, updateActiveChatId } = useChatScroll(messages, chat.activeChatId);
 
 watch(() => chatTitle.value || '', (newTitle: string) => {
   chat.renameChat(chat.activeChatId, newTitle);
@@ -17,6 +21,10 @@ watch(() => chatTitle.value || '', (newTitle: string) => {
 
 watch(() => chat.activeChat?.title || '', (newTitle: string) => {
   chatTitle.value = newTitle;
+});
+
+watch(() => chat.activeChatId, (newId: string) => {
+  updateActiveChatId(newId);
 });
 </script>
 
@@ -32,7 +40,7 @@ watch(() => chat.activeChat?.title || '', (newTitle: string) => {
       ></v-text-field>
     </div>
 
-    <div ref="chatMessagesRef" class="chat-messages">
+    <div ref="chatMessagesRef" class="chat-messages" :style="{ paddingBottom: `${chatGap}px` }">
       <template v-if="chat.activeChat?.messages?.length">
         <div
           v-for="message in chat.activeChat?.messages"
@@ -65,7 +73,7 @@ watch(() => chat.activeChat?.title || '', (newTitle: string) => {
         variant="elevated"
         color="blue"
         icon="mdi-arrow-collapse-down"
-        @click="scrollDown"
+        @click="scrollDown(true)"
       ></v-btn>
     </v-fade-transition>
 
@@ -74,7 +82,6 @@ watch(() => chat.activeChat?.title || '', (newTitle: string) => {
 </template>
 
 <style lang="scss" scoped>
-
 .chat-page {
   position: relative;
   display: flex;
@@ -145,7 +152,7 @@ watch(() => chat.activeChat?.title || '', (newTitle: string) => {
     position: absolute;
     transform: translateX(-50%);
     left: 50%;
-    bottom: 130px;
+    bottom: 120px;
     color: white;
   }
 }

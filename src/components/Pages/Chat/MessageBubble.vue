@@ -4,7 +4,7 @@ import {useChatStore} from "@/stores/chat.ts";
 import {useAlert} from "@/plugins/alertPlugin.ts";
 import {computed, nextTick, onMounted, ref, watch} from "vue";
 import "highlight.js/styles/default.css";
-import {parseMarkdown, wrapThinkBlocks} from "@/utils/markdown.ts";
+import {parseMarkdown} from "@/utils/markdown.ts";
 import {useCopyCode} from "@/composables/useCopyCode.ts";
 
 const props = defineProps<{

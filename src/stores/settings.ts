@@ -37,13 +37,5 @@ export const useSettingsStore = defineStore('settings', {
         console.error('Failed to save settings to localStorage:', error);
       }
     },
-    selectModel(model: string) {
-      // Специфичная акция для обновления selectedModel
-      if (!model) {
-        console.warn('selectModel called with invalid model:', model);
-        return;
-      }
-      this.updateSettings({ selectedModel: model });
-    },
   },
 });

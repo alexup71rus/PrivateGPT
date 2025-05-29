@@ -9,6 +9,7 @@ export const DEFAULT_SETTINGS = {
   defaultChatTitle: 'Новый чат' as string,
   theme: 'dark' as Theme,
   isSearchAsDefault: false as boolean,
+  chatScrollMode: 'scroll' as 'gap' | 'scroll',
   systemModel: 'llama3.2:latest',
   titlePrompt: 'You are an assistant that generates a concise chat title based on a user message and assistant response. Return a JSON object with a "title" field containing a short, descriptive title (max 50 characters) summarizing the conversation topic.' as string,
   memoryPrompt: `You are an assistant that extracts factual information about the user based on a short conversation.
