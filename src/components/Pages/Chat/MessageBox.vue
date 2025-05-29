@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import {computed, nextTick, onMounted, ref, watch} from "vue";
 import {useChatStore} from "@/stores/chat.ts";
-import type {ChatModel} from "@/types/chats.ts";
+import type {Attachment, AttachmentMeta, ChatModel} from "@/types/chats.ts";
 import {useSettingsStore} from "@/stores/settings.ts";
 
 const chat = useChatStore();
@@ -12,7 +12,7 @@ const activeChat = computed(() => chat.activeChat);
 const activeChatId = computed(() => chat.activeChatId);
 const messageText = ref('');
 const attachment = ref<File | null>(null);
-const attachmentContent = ref<{ content: string, type: 'text' | 'image', meta: File } | null>(null);
+const attachmentContent = ref<{ content: string, type: 'text' | 'image', meta: AttachmentMeta } | null>(null);
 const isSearch = ref(settings.isSearchAsDefault);
 const canSend = computed(() => chat.isSending ? false : messageText.value.trim());
 
@@ -54,10 +54,48 @@ function handleFilesSelected(event: Event) {
     const result = reader.result as string;
 
     if (isImage) {
-      const base64 = result.split(',')[1];
-      attachmentContent.value = { content: base64, type: 'image', meta: file };
+      const img = new Image();
+      img.src = result;
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        const maxWidth = 1024;
+        const maxHeight = 768;
+
+        if (width > maxWidth || height > maxHeight) {
+          const ratio = Math.min(maxWidth / width, maxHeight / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const base64 = canvas.toDataURL('image/jpeg', 0.8);
+        const compressedBase64 = base64.split(',')[1];
+
+        attachmentContent.value = {
+          content: compressedBase64,
+          type: 'image',
+          meta: {
+            name: file.name,
+            size: file.size,
+            type: isImage ? 'image' : 'text',
+            lastModified: file.lastModified,
+          },
+        };
+      };
     } else {
-      attachmentContent.value = { content: result, type: 'text', meta: file };
+      attachmentContent.value = { content: result, type: 'text', meta: {
+            name: file.name,
+            size: file.size,
+            type: isImage ? 'image' : 'text',
+            lastModified: file.lastModified,
+          }
+      };
     }
 
     attachment.value = file;
@@ -88,7 +126,7 @@ async function sendMessage() {
 
   chat.setIsSending(true);
   try {
-    await chat.sendMessage(activeChatId.value, messageText.value, attachmentContent.value);
+    await chat.sendMessage(activeChatId.value, messageText.value, { ...attachmentContent.value } as Attachment);
     messageText.value = '';
     attachment.value = null;
     attachmentContent.value = null;

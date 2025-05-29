@@ -87,12 +87,12 @@ export async function saveChat(chat: Chat): Promise<void> {
     const store: IDBObjectStore = transaction.objectStore('chats');
 
     // Ensure chat is serializable
-    const serializableChat = {
+    const serializableChat = JSON.parse(JSON.stringify({
       ...chat,
       messages: chat.messages.map(message => ({
         ...message,
       })),
-    };
+    }));
 
     await new Promise<void>((resolve, reject) => {
       const request: IDBRequest = store.put(serializableChat);

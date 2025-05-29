@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import type {Attachment, Message} from "@/types/chats.ts";
+import type {Attachment, AttachmentMeta, Message} from "@/types/chats.ts";
 import {useChatStore} from "@/stores/chat.ts";
 import {useAlert} from "@/plugins/alertPlugin.ts";
 import {computed, nextTick, onMounted, ref, watch} from "vue";
@@ -93,7 +93,7 @@ const saveEditedMessage = async (makeResend = false) => {
       props.message.attachmentContent ? {
         content: props.message.attachmentContent,
         type: props.message.attachmentMeta?.type || 'text',
-        meta: props.message.attachmentMeta
+        meta: props.message.attachmentMeta as AttachmentMeta
       } as Attachment : null
     );
   } else {
@@ -108,7 +108,7 @@ const saveEditedMessage = async (makeResend = false) => {
       prevMessage.attachmentContent ? {
         content: prevMessage.attachmentContent,
         type: prevMessage.attachmentMeta?.type || 'text',
-        meta: prevMessage.attachmentMeta
+        meta: prevMessage.attachmentMeta as AttachmentMeta
       } as Attachment : null
     );
   }
