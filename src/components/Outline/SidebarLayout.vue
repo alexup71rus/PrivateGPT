@@ -111,6 +111,7 @@ onMounted(initializeChat);
     <transition name="fade">
       <div v-if="app.isAsideOpen && isChatPage" class="chats-container">
         <v-text-field
+          class="chats-search-input"
           v-model="searchQuery"
           label="Поиск"
           variant="solo-inverted"
@@ -255,7 +256,7 @@ onMounted(initializeChat);
 }
 
 .chats-container {
-  margin: 30px 0;
+  margin: 25px 0;
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -263,11 +264,15 @@ onMounted(initializeChat);
   min-height: 0;
 }
 
+.chats-search-input {
+  flex: 0;
+}
+
 .chat-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  height: calc(100vh - 240px);
+  height: calc(100vh - 300px);
   overflow-y: auto;
   flex: 1 1 auto;
   min-height: 0;

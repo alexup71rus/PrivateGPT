@@ -13,6 +13,8 @@ const route = useRoute();
 const { selectChat } = useChatActions();
 const { isChatPage } = useAppRouting();
 
+const isElectron = !!(window as any).electronAPI;
+
 onMounted(async () => {
   await chat.fetchModels();
   await chat.initialize();
@@ -36,10 +38,36 @@ watch(
     }
   }
 );
+
+// Методы для управления окном через IPC
+const minimizeWindow = () => {
+  (window as any).electronAPI.minimizeWindow();
+};
+
+const maximizeWindow = () => {
+  (window as any).electronAPI.maximizeWindow();
+};
+
+const closeWindow = () => {
+  (window as any).electronAPI.closeWindow();
+};
 </script>
 
 <template>
   <v-app>
+    <v-app-bar v-if="isElectron" app flat dark>
+      <v-toolbar-title>PrivateGPT</v-toolbar-title>
+      <v-spacer></v-spacer>
+      <v-btn icon size="small" @click="minimizeWindow">
+        <v-icon>mdi-window-minimize</v-icon>
+      </v-btn>
+      <v-btn icon size="small" @click="maximizeWindow">
+        <v-icon>mdi-window-maximize</v-icon>
+      </v-btn>
+      <v-btn icon size="small" color="red" @click="closeWindow">
+        <v-icon>mdi-window-close</v-icon>
+      </v-btn>
+    </v-app-bar>
     <AlertProvider />
     <v-main>
       <div
@@ -74,5 +102,14 @@ watch(
   display: flex;
   flex-direction: column;
   height: var(--main-height);
+}
+
+/* Для перетаскивания окна */
+.v-app-bar {
+  -webkit-app-region: drag;
+}
+
+.v-btn {
+  -webkit-app-region: no-drag;
 }
 </style>

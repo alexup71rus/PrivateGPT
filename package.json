@@ -3,20 +3,24 @@
   "private": true,
   "type": "module",
   "version": "0.0.0",
+  "main": "electron/main.mjs",
   "scripts": {
-    "dev": "run-p dev:backend dev:frontend",
+    "dev": "run-p dev:frontend dev:backend",
     "dev:frontend": "vite",
-    "dev:backend": "node backend/server.js",
-    "build": "run-p type-check \"build-only {@}\" --",
-    "preview": "vite preview",
-    "build-only": "vite build",
-    "type-check": "vue-tsc --build --force",
-    "lint": "eslint . --fix"
+    "dev:backend": "node backend/server.mjs",
+    "dev:electron": "run-p dev:frontend electron:serve",
+    "electron:serve": "wait-on http://localhost:3000 && electron electron/main.mjs --dev",
+    "build": "run-p build:frontend build:electron",
+    "build:frontend": "vite build",
+    "build:electron": "electron-builder",
+    "preview": "vite preview"
   },
   "dependencies": {
     "@fontsource/roboto": "5.2.5",
     "@mdi/font": "7.4.47",
     "axios": "^1.9.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
     "highlight.js": "^11.11.1",
     "marked": "^15.0.12",
     "marked-highlight": "^2.2.1",
@@ -30,6 +34,9 @@
     "@types/node": "^22.9.0",
     "@vitejs/plugin-vue": "^5.2.3",
     "@vue/tsconfig": "^0.7.0",
+    "electron": "^36.3.2",
+    "electron-builder": "^25.1.8",
+    "electron-rebuild": "^3.2.9",
     "eslint": "^9.23.0",
     "eslint-config-vuetify": "^3.0.3",
     "npm-run-all2": "^7.0.2",
@@ -41,6 +48,24 @@
     "vite": "^6.2.2",
     "vite-plugin-vuetify": "^2.1.1",
     "vue-router": "^4.5.0",
-    "vue-tsc": "^2.2.8"
+    "vue-tsc": "^2.2.8",
+    "wait-on": "^7.0.1"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "esbuild"
+    ]
+  },
+  "build": {
+    "appId": "com.example.privategpt",
+    "productName": "PrivateGPT",
+    "files": [
+      "dist/**/*",
+      "electron/**/*"
+    ],
+    "directories": {
+      "output": "dist_electron"
+    }
   }
 }
