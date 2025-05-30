@@ -14,7 +14,6 @@ declare module 'vue' {
     General: typeof import('./components/Pages/Settings/General.vue')['default']
     MessageBox: typeof import('./components/Pages/Chat/MessageBox.vue')['default']
     MessageBubble: typeof import('./components/Pages/Chat/MessageBubble.vue')['default']
-    ModalChatContent: typeof import('./components/Dialogs/ModalChatContent.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     SidebarLayout: typeof import('./components/Outline/SidebarLayout.vue')['default']
