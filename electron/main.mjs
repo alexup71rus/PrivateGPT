@@ -1,11 +1,16 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import express from 'express';
+import { createServer } from 'http';
+import cors from 'cors';
+import { router } from '../backend/api/routes.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 let mainWindow;
+let backendPort;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -52,8 +57,25 @@ function createWindow() {
   });
 }
 
+function startBackend() {
+  const backend = express();
+  backend.use(cors({ origin: 'http://localhost:3000' }));
+  backend.use(express.json());
+  backend.use('/api', router);
+  const server = createServer(backend);
+  server.listen(0, 'localhost', () => {
+    backendPort = server.address().port;
+    console.log(`Electron backend running on http://localhost:${backendPort}`);
+    mainWindow.webContents.on('did-finish-load', () => {
+      mainWindow.webContents.send('backend-port', backendPort);
+      console.log(`Sent backend-port ${backendPort} to frontend`);
+    });
+  });
+}
+
 app.whenReady().then(() => {
   createWindow();
+  startBackend();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

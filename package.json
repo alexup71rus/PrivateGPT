@@ -62,7 +62,8 @@
     "productName": "PrivateGPT",
     "files": [
       "dist/**/*",
-      "electron/**/*"
+      "electron/**/*",
+      "backend/**/*"
     ],
     "directories": {
       "output": "dist_electron"
