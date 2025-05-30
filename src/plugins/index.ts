@@ -22,5 +22,5 @@ export function registerPlugins (app: App) {
     .use(pinia)
     .use(createAlertPlugin())
     .use(createSettingsPlugin())
-    .use(httpPlugin)
+    .use(httpPlugin);
 }

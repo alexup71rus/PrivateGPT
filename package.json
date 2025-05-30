@@ -7,20 +7,31 @@
   "scripts": {
     "dev": "run-p dev:frontend dev:backend",
     "dev:frontend": "vite",
-    "dev:backend": "node backend/server.mjs",
+    "dev:backend": "pnpm --prefix backend start:dev",
     "dev:electron": "run-p dev:frontend electron:serve",
     "electron:serve": "wait-on http://localhost:3000 && electron electron/main.mjs --dev",
-    "build": "run-p build:frontend build:electron",
+    "build": "run-p build:frontend build:backend build:electron",
     "build:frontend": "vite build",
+    "build:backend": "pnpm --prefix backend build",
     "build:electron": "electron-builder",
     "preview": "vite preview"
   },
   "dependencies": {
     "@fontsource/roboto": "5.2.5",
     "@mdi/font": "7.4.47",
+    "@nestjs/apollo": "^13.1.0",
+    "@nestjs/common": "^11.1.2",
+    "@nestjs/core": "^11.1.2",
+    "@nestjs/graphql": "^13.1.0",
+    "@nestjs/platform-express": "^11.1.2",
+    "@vue/apollo-option": "^4.2.2",
+    "apollo-server-express": "^3.13.0",
     "axios": "^1.9.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",
+    "graphql": "^16.11.0",
+    "graphql-request": "^7.2.0",
+    "graphql-tag": "^2.12.6",
     "highlight.js": "^11.11.1",
     "marked": "^15.0.12",
     "marked-highlight": "^2.2.1",
@@ -30,6 +41,7 @@
     "vuetify": "^3.8.1"
   },
   "devDependencies": {
+    "@nestjs/cli": "^11.0.7",
     "@tsconfig/node22": "^22.0.0",
     "@types/node": "^22.9.0",
     "@vitejs/plugin-vue": "^5.2.3",
@@ -54,7 +66,8 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "electron",
-      "esbuild"
+      "esbuild",
+      "@nestjs/core"
     ]
   },
   "build": {
@@ -63,7 +76,7 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
-      "backend/**/*"
+      "backend/dist/**/*"
     ],
     "directories": {
       "output": "dist_electron"

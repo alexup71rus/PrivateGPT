@@ -8,7 +8,6 @@ import {useAlert} from "@/plugins/alertPlugin.ts";
 import {useDeleteButton} from "@/composables/useDeleteButton.ts";
 import type {Chat} from "@/types/chats.ts";
 import {formatDate} from "../../utils/chatUtils.ts";
-import {getTest} from "@/api";
 
 const props = defineProps<{
   isChatPage: boolean;
@@ -63,8 +62,6 @@ const toggleSettings = async () => {
 };
 
 const initializeChat = () => {
-  getTest();
-
   const hash = window.location.hash.slice(1);
   if (hash && chat.chats.some((chat) => chat.id === hash)) {
     selectChat(hash);
