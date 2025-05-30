@@ -6,6 +6,8 @@ import {useChatActions} from "@/composables/useChatActions.ts";
 import {useAppStore} from "@/stores/app.ts";
 import {useAlert} from "@/plugins/alertPlugin.ts";
 import {useDeleteButton} from "@/composables/useDeleteButton.ts";
+import type {Chat} from "@/types/chats.ts";
+import {formatDate} from "../../utils/chatUtils.ts";
 
 const props = defineProps<{
   isChatPage: boolean;
@@ -19,11 +21,26 @@ const { onNewChat, selectChat, deleteChat } = useChatActions();
 const { handleFirstClick, handleSecondClick, resetDeletePending, isPending } = useDeleteButton(deleteChat);
 
 const searchQuery = ref<string>('');
-const filteredChats = computed(() => {
-  if (!searchQuery.value) return chat.chats;
-  return chat.chats.filter((chat) =>
-    chat.title.toLowerCase().includes(searchQuery.value.toLowerCase())
-  );
+
+const groupedChats = computed(() => {
+  const groups: { [key: string]: Chat[] } = {};
+  const sortedChats = [...chat.chats]
+    .filter((chat) => chat.title.toLowerCase().includes(searchQuery.value?.toLowerCase() || ''))
+    .sort((a, b) => b.timestamp - a.timestamp);
+
+  sortedChats.forEach((chat) => {
+    const date = new Date(chat.timestamp);
+    const dateKey = date.toDateString();
+    if (!groups[dateKey]) {
+      groups[dateKey] = [];
+    }
+    groups[dateKey].push(chat);
+  });
+
+  return Object.entries(groups).map(([dateKey, chats]) => ({
+    date: new Date(dateKey),
+    chats,
+  }));
 });
 
 const handleChatClick = (id: string) => {
@@ -46,7 +63,7 @@ const toggleSettings = async () => {
 
 const initializeChat = () => {
   const hash = window.location.hash.slice(1);
-  if (hash && chat.chats.some(chat => chat.id === hash)) {
+  if (hash && chat.chats.some((chat) => chat.id === hash)) {
     selectChat(hash);
     return;
   }
@@ -62,7 +79,7 @@ const removeAllChats = async () => {
     message: 'Вы действительно хотите удалить все чаты?',
     buttons: [
       { text: 'Да', color: 'warning', value: true },
-      { text: 'Отмена', color: 'white', value: false }
+      { text: 'Отмена', color: 'white', value: false },
     ],
     resolve: () => {
       chat.clearChats();
@@ -112,21 +129,24 @@ onMounted(initializeChat);
         </v-text-field>
 
         <div class="chat-list">
-          <div
-            v-for="_chat in filteredChats"
-            :key="_chat.id"
-            :class="['chat-item', { 'chat-item--selected': chat.activeChatId === _chat.id }]"
-            @click="handleChatClick(_chat.id)"
-          >
-            <span>{{ _chat.title }}</span>
-            <v-btn
-              class="delete-btn"
-              :color="isPending(_chat.id) ? 'red' : ''"
-              icon="mdi-delete"
-              size="small"
-              @click.stop="isPending(_chat.id) ? handleSecondClick(_chat.id) : handleFirstClick(_chat.id)"
-              @mouseleave="resetDeletePending"
-            />
+          <div v-for="group in groupedChats" :key="group.date.toString()" class="chat-group">
+            <div class="date-divider">{{ formatDate(group.date.getTime()) }}</div>
+            <div
+              v-for="_chat in group.chats"
+              :key="_chat.id"
+              :class="['chat-item', { 'chat-item--selected': chat.activeChatId === _chat.id }]"
+              @click="handleChatClick(_chat.id)"
+            >
+              <span>{{ _chat.title }}</span>
+              <v-btn
+                class="delete-btn"
+                :color="isPending(_chat.id) ? 'red' : ''"
+                icon="mdi-delete"
+                size="small"
+                @click.stop="isPending(_chat.id) ? handleSecondClick(_chat.id) : handleFirstClick(_chat.id)"
+                @mouseleave="resetDeletePending"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -247,11 +267,29 @@ onMounted(initializeChat);
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding-top: 6px;
-  height: calc(100vh - 234px);
+  height: calc(100vh - 240px);
   overflow-y: auto;
   flex: 1 1 auto;
   min-height: 0;
+}
+
+.chat-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.date-divider {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background-color: rgb(var(--v-theme-surface));
+  font-size: 14px;
+  font-weight: bold;
+  color: rgba(var(--v-theme-on-surface), 0.6);
+  padding: 8px 16px;
+  border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.1);
+  margin-top: 5px;
 }
 
 .chat-item {

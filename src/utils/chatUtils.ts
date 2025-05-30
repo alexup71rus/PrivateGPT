@@ -17,3 +17,21 @@ export const copyToClipboard = async (text: string, message = 'Скопиров�
   await navigator.clipboard.writeText(text);
   showSnackbar({ message, type: 'success' });
 };
+
+export const formatDate = (timestamp: number) => {
+  const date = new Date(timestamp);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+
+  const isToday = date.toDateString() === today.toDateString();
+  const isYesterday = date.toDateString() === yesterday.toDateString();
+
+  if (isToday) return 'Сегодня';
+  if (isYesterday) return 'Вчера';
+
+  return date.toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+  });
+};
