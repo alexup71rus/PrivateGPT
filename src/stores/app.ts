@@ -1,7 +1,7 @@
-import {defineStore} from 'pinia';
-import {useHttpService} from "@/plugins/httpPlugin";
-import type {ISettings} from "@/types/settings.ts";
-import {useSettingsStore} from "@/stores/settings.ts";
+import { defineStore } from 'pinia';
+import { useHttpService } from '@/plugins/httpPlugin';
+import type { ISettings } from '@/types/settings.ts';
+import { useSettingsStore } from '@/stores/settings.ts';
 
 export const useAppStore = defineStore('app', {
   state: () => {
@@ -18,7 +18,7 @@ export const useAppStore = defineStore('app', {
   getters: {
   },
   actions: {
-    setAside(value: boolean) {
+    setAside (value: boolean) {
       this.isAsideOpen = value;
       this.updateSettings({
         isAsideOpen: value,

@@ -96,6 +96,27 @@ export const useChatStore = defineStore('chat', {
       this.isSending = value;
     },
 
+    async addMemoryMessage (chatId: string) {
+      console.log('addMemoryMessage', chatId);
+      const chat = this.getChat(chatId);
+      if (!chat || chat.messages.length > 0) return;
+
+      await this.fetchMemory();
+      console.log(this.memory);
+      if (this.memory.length > 0) {
+        const memoryContent = this.memory
+          .map(entry => entry.content)
+          .join('\n---\n') + '\n---\n';
+        chat.messages.push({
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: `Memory context:\n${memoryContent}`,
+          timestamp: new Date().getTime(),
+        });
+        await this.persistChat(chatId);
+      }
+    },
+
     async createChat () {
       const newChat: Chat = {
         id: crypto.randomUUID(),
@@ -106,6 +127,7 @@ export const useChatStore = defineStore('chat', {
 
       this.chats.unshift(newChat);
       this.activeChatId = newChat.id;
+      await this.addMemoryMessage(newChat.id);
       await this.persistChat(newChat.id);
 
       return newChat;
@@ -116,7 +138,7 @@ export const useChatStore = defineStore('chat', {
       this.error = null;
       try {
         await deleteChat(chatId);
-        await this.fetchChats(); // Refresh chats from backend
+        await this.fetchChats();
         if (this.activeChatId === chatId) {
           this.activeChatId = this.chats[0]?.id || (await this.createChat())?.id || '';
         }
@@ -273,6 +295,10 @@ export const useChatStore = defineStore('chat', {
         this.abortController?.abort();
         this.abortController = new AbortController();
 
+        if (chat.messages.length === 0) {
+          await this.addMemoryMessage(chatId);
+        }
+
         let finalContent = content;
         let images: string[] | undefined;
         let userMessageId: string | null;
@@ -290,7 +316,6 @@ export const useChatStore = defineStore('chat', {
             finalContent = `<hidden>\n${attachmentContent.content}\n${metaInfo}\n</hidden>${content}`;
           }
 
-          // Map the attachment type to the enum
           const mappedAttachment: Attachment | undefined = attachmentContent
             ? {
               ...attachmentContent,
@@ -557,14 +582,17 @@ export const useChatStore = defineStore('chat', {
 
       await this.sendMessage(chatId, prevMessage.content, prevMessage.attachmentContent ? {
         content: prevMessage.attachmentContent,
-        type: prevMessage.attachmentMeta?.type || 'text',
+        type: prevMessage.attachmentMeta?.type || AttachmentType.TEXT,
         meta: prevMessage.attachmentMeta as File,
-      } : null);
+      } as Attachment : null);
     },
 
-    async saveSummary (chatId: string, messageId: string) {
+    async saveSummary (chatId: string, messageId: string): Promise<string | null> {
       const chat = this.getChat(chatId);
-      if (!chat) return;
+      if (!chat) {
+        console.error(`Chat with ID ${chatId} not found`);
+        return null;
+      }
 
       const messageIndex = chat.messages.findIndex(m => m.id === messageId);
       const recentMessages = chat.messages.slice(Math.max(0, messageIndex - 3), messageIndex + 1);
@@ -594,25 +622,31 @@ export const useChatStore = defineStore('chat', {
           },
         });
 
-        const facts = JSON.parse(response?.message?.content)?.facts;
-        if (Array.isArray(facts) && facts.length > 0) {
-          const summary = facts.join('. ') + '.';
-          const now = Date.now();
-
-          this.memory = (this.memory || []).filter(entry => now - entry.timestamp < 1200000);
-          this.memory.push({ content: summary, timestamp: now });
-
-          while (this.memory.length > 10) {
-            this.memory.shift();
-          }
-
-          await saveMemory(this.memory);
-          return summary;
+        let facts: string[] = [];
+        try {
+          facts = JSON.parse(response?.message?.content)?.facts || [];
+        } catch (parseError) {
+          console.error(`Failed to parse API response for chat ${chatId}, message ${messageId}:`, parseError);
+          return null;
         }
 
-        return null;
+        if (!Array.isArray(facts) || facts.length === 0) {
+          console.warn(`Empty or invalid facts received for chat ${chatId}, message ${messageId}`);
+          return null;
+        }
+
+        const summary = facts.join('. ') + '.';
+        const newEntry: MemoryEntry = {
+          content: summary,
+          timestamp: Date.now(),
+        };
+
+        this.memory = [...(this.memory || []), newEntry];
+        await saveMemory(this.memory);
+
+        return summary;
       } catch (error) {
-        console.error('Error while saving summary:', error);
+        console.error(`Error saving summary for chat ${chatId}, message ${messageId}:`, error);
         this.error = error instanceof Error ? error.message : 'Failed to save summary';
         return null;
       }

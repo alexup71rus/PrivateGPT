@@ -1,153 +1,153 @@
 <script lang="ts" setup>
-import type { Attachment, AttachmentMeta, Message } from '@/types/chats';
-import { useChatStore } from '@/stores/chat';
-import { useAlert } from '@/plugins/alertPlugin';
-import { computed, onMounted, ref } from 'vue';
-import 'highlight.js/styles/default.css';
-import { parseMarkdown } from '@/utils/markdown';
-import { useCopyCode } from '@/composables/useCopyCode';
-import { copyToClipboard } from '@/utils/chatUtils';
-import AttachmentChip from '@/components/Pages/Chat/AttachmentChip.vue';
-import ThinkPreview from '@/components/Pages/Chat/ThinkPreview.vue';
+  import type { Attachment, AttachmentMeta, Message } from '@/types/chats';
+  import { useChatStore } from '@/stores/chat';
+  import { useAlert } from '@/plugins/alertPlugin';
+  import { computed, onMounted, ref } from 'vue';
+  import 'highlight.js/styles/default.css';
+  import { parseMarkdown } from '@/utils/markdown';
+  import { useCopyCode } from '@/composables/useCopyCode';
+  import { copyToClipboard } from '@/utils/chatUtils';
+  import AttachmentChip from '@/components/Pages/Chat/AttachmentChip.vue';
+  import ThinkPreview from '@/components/Pages/Chat/ThinkPreview.vue';
 
-const props = defineProps<{
-  message: Message;
-}>();
+  const props = defineProps<{
+    message: Message;
+  }>();
 
-const chat = useChatStore();
-const { showSnackbar } = useAlert();
-const bubbleRef = ref();
-const isEditDialogOpen = ref(false);
-const editedContent = ref('');
+  const chat = useChatStore();
+  const { showSnackbar } = useAlert();
+  const bubbleRef = ref();
+  const isEditDialogOpen = ref(false);
+  const editedContent = ref('');
 
-useCopyCode(bubbleRef, showSnackbar);
+  useCopyCode(bubbleRef, showSnackbar);
 
-const parsedContent = computed(() => parseMarkdown(props.message.content));
+  const parsedContent = computed(() => parseMarkdown(props.message.content));
 
-const copyCodeBlock = async (code: string) => {
-  await navigator.clipboard.writeText(code);
-  showSnackbar({ message: 'Код скопирован!', type: 'success' });
-};
+  const copyCodeBlock = async (code: string) => {
+    await navigator.clipboard.writeText(code);
+    showSnackbar({ message: 'Код скопирован!', type: 'success' });
+  };
 
-const openEditDialog = () => {
-  editedContent.value = props.message.content;
-  isEditDialogOpen.value = true;
-};
+  const openEditDialog = () => {
+    editedContent.value = props.message.content;
+    isEditDialogOpen.value = true;
+  };
 
-const saveEditedMessage = async (makeResend = false) => {
-  if (!editedContent.value.trim()) {
-    showSnackbar({ message: 'Текст не может быть пустым', type: 'warning' });
-    return;
-  }
+  const saveEditedMessage = async (makeResend = false) => {
+    if (!editedContent.value.trim()) {
+      showSnackbar({ message: 'Текст не может быть пустым', type: 'warning' });
+      return;
+    }
 
-  await chat.editMessage(chat.activeChatId, props.message.id, editedContent.value);
-  showSnackbar({ message: 'Сообщение обновлено', type: 'success' });
+    await chat.editMessage(chat.activeChatId, props.message.id, editedContent.value);
+    showSnackbar({ message: 'Сообщение обновлено', type: 'success' });
 
-  if (!makeResend) {
+    if (!makeResend) {
+      isEditDialogOpen.value = false;
+      return;
+    }
+
+    const _chat = chat.activeChat;
+    if (!_chat) return;
+
+    const index = _chat.messages.findIndex(m => m.id === props.message.id);
+    if (index < 0) return;
+
+    _chat.messages = _chat.messages.slice(0, index);
+    await chat.persistChat(_chat.id);
+
+    chat.setIsSending(true);
+
+    if (props.message.role === 'user') {
+      await chat.sendMessage(
+        chat.activeChatId,
+        editedContent.value,
+        props.message.attachmentContent
+          ? { content: props.message.attachmentContent, type: props.message.attachmentMeta?.type || 'TEXT', meta: props.message.attachmentMeta as AttachmentMeta } as Attachment
+          : null
+      );
+    } else {
+      if (index === 0) return;
+
+      const prevMessage = _chat.messages[index - 1];
+      if (prevMessage.role !== 'user') return;
+
+      await chat.sendMessage(
+        chat.activeChatId,
+        prevMessage.content,
+        prevMessage.attachmentContent
+          ? { content: prevMessage.attachmentContent, type: prevMessage.attachmentMeta?.type || 'TEXT', meta: prevMessage.attachmentMeta as AttachmentMeta } as Attachment
+          : null
+      );
+    }
+
+    chat.setIsSending(false);
     isEditDialogOpen.value = false;
-    return;
-  }
+  };
 
-  const _chat = chat.activeChat;
-  if (!_chat) return;
+  const closeEditDialog = () => {
+    isEditDialogOpen.value = false;
+  };
 
-  const index = _chat.messages.findIndex((m) => m.id === props.message.id);
-  if (index < 0) return;
+  onMounted(() => {
+    bubbleRef.value.addEventListener('click', async (ev: MouseEvent) => {
+      const target = ev.target as HTMLElement;
 
-  _chat.messages = _chat.messages.slice(0, index);
-  await chat.persistChat(_chat.id);
+      if (target.classList.contains('copy-button')) {
+        const block = target.parentElement;
 
-  chat.setIsSending(true);
-
-  if (props.message.role === 'user') {
-    await chat.sendMessage(
-      chat.activeChatId,
-      editedContent.value,
-      props.message.attachmentContent
-        ? { content: props.message.attachmentContent, type: props.message.attachmentMeta?.type || 'text', meta: props.message.attachmentMeta as AttachmentMeta } as Attachment
-        : null
-    );
-  } else {
-    if (index === 0) return;
-
-    const prevMessage = _chat.messages[index - 1];
-    if (prevMessage.role !== 'user') return;
-
-    await chat.sendMessage(
-      chat.activeChatId,
-      prevMessage.content,
-      prevMessage.attachmentContent
-        ? { content: prevMessage.attachmentContent, type: prevMessage.attachmentMeta?.type || 'text', meta: prevMessage.attachmentMeta as AttachmentMeta } as Attachment
-        : null
-    );
-  }
-
-  chat.setIsSending(false);
-  isEditDialogOpen.value = false;
-};
-
-const closeEditDialog = () => {
-  isEditDialogOpen.value = false;
-};
-
-onMounted(() => {
-  bubbleRef.value.addEventListener('click', async (ev: MouseEvent) => {
-    const target = ev.target as HTMLElement;
-
-    if (target.classList.contains('copy-button')) {
-      const block = target.parentElement;
-
-      if (block) {
-        const codeElement = block.querySelector('code');
-        if (codeElement) {
-          const code = codeElement.innerText.replace(/^\d+\s+/gm, '');
-          await copyCodeBlock(code);
+        if (block) {
+          const codeElement = block.querySelector('code');
+          if (codeElement) {
+            const code = codeElement.innerText.replace(/^\d+\s+/gm, '');
+            await copyCodeBlock(code);
+          }
         }
       }
-    }
+    });
   });
-});
 
-const deleteMessage = () => {
-  const chatId = chat.activeChatId;
-  if (chatId) chat.deleteMessage(chatId, props.message.id);
-};
+  const deleteMessage = () => {
+    const chatId = chat.activeChatId;
+    if (chatId) chat.deleteMessage(chatId, props.message.id);
+  };
 
-const regenerateMessage = async () => {
-  const _chat = chat.activeChat;
-  if (!_chat) return;
-  const index = _chat.messages.findIndex((m) => m.id === props.message.id);
-  if (index <= 0) return;
-  const prev = _chat.messages[index - 1];
-  if (prev.role !== 'user') return;
+  const regenerateMessage = async () => {
+    const _chat = chat.activeChat;
+    if (!_chat) return;
+    const index = _chat.messages.findIndex(m => m.id === props.message.id);
+    if (index <= 0) return;
+    const prev = _chat.messages[index - 1];
+    if (prev.role !== 'user') return;
 
-  chat.setIsSending(true);
-  await chat.regenerateMessage(_chat.id, props.message.id);
-  chat.setIsSending(false);
-};
+    chat.setIsSending(true);
+    await chat.regenerateMessage(_chat.id, props.message.id);
+    chat.setIsSending(false);
+  };
 
-const saveSummary = async () => {
-  const chatId = chat.activeChatId;
-  if (chatId) {
-    try {
-      const result = await chat.saveSummary(chatId, props.message.id);
-      showSnackbar({
-        message: result ? 'Память обновлена: ' + result : 'Нечего сохранять',
-        type: result ? 'success' : 'warning',
-      });
-    } catch (error) {
-      showSnackbar({ message: 'Ошибка при сохранении саммари', type: 'error' });
+  const saveSummary = async () => {
+    const chatId = chat.activeChatId;
+    if (chatId) {
+      try {
+        const result = await chat.saveSummary(chatId, props.message.id);
+        showSnackbar({
+          message: result ? 'Память обновлена: ' + result : 'Нечего сохранять',
+          type: result ? 'success' : 'warning',
+        });
+      } catch (error) {
+        showSnackbar({ message: 'Ошибка при сохранении саммари', type: 'error' });
+      }
     }
-  }
-};
+  };
 </script>
 
 <template>
-  <div ref="bubbleRef" :class="message.role" class="message-bubble">
+  <div ref="bubbleRef" class="message-bubble" :class="message.role">
     <AttachmentChip
       v-if="message.attachmentMeta"
-      :meta="message.attachmentMeta"
       :content="message.attachmentContent || ''"
+      :meta="message.attachmentMeta"
     />
     <ThinkPreview v-if="message.thinkTime !== undefined" :message="message" />
     <div class="content" v-html="parsedContent" />
