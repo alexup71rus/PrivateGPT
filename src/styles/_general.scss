@@ -4,28 +4,29 @@
   --aside-width--collapsed: 68px;
   --aside-width--showed: 350px;
   --header-height: 64px;
+  --v-border-opacity: 1;
 }
 
 :root .v-theme--light {
-  --v-theme-surface: 255 255 255;
+  --v-theme-surface: 255, 255, 255;
   --v-theme-surface-rgba: 255, 255, 255;
   --v-theme-background: 245 245 245;
   --v-theme-on-background: 66 66 66;
   --v-theme-surface-variant: 230 230 230;
   --v-theme-surface-bright: 240 240 240;
   --v-theme-primary: 25 118 210;
-  --v-theme-on-surface: 66 66 66;
+  --v-theme-on-surface: 66, 66, 66;
 }
 
 :root .v-theme--dark {
-  --v-theme-surface: 37 38 44;
+  --v-theme-surface: 37, 38, 44;
   --v-theme-surface-rgba: 37, 38, 44;
   --v-theme-background: 26 27 32;
   --v-theme-on-background: 221 221 221;
   --v-theme-surface-variant: 37 38 44;
   --v-theme-surface-bright: 180 180 180;
   --v-theme-primary: 100 181 246;
-  --v-theme-on-surface: 221 221 221;
+  --v-theme-on-surface: 221, 221, 221;
   --v-theme-on-primary: 33 33 33;
   --v-theme-on-surface-variant: 221 221 221;
 }
@@ -41,6 +42,8 @@
 .v-expansion-panel * {
   color: rgb(var(--v-theme-on-surface));
 }
+
+
 
 /* Transition styles */
 

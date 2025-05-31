@@ -176,7 +176,7 @@
         auto-grow
         class="chat-input"
         density="comfortable"
-        :disabled="chat.isSending"
+        :disabled="chat.isSending || chat.models?.length === 0"
         hide-details
         placeholder="Введите сообщение..."
         rows="1"
@@ -204,26 +204,29 @@
         <v-card min-width="300">
           <v-card-text class="pa-2">
             <div class="autocomplete-model__list">
-              <v-list-item
-                v-for="model in filteredModels"
-                :key="model"
-                :active="model === selectedModel"
-                :value="model"
-                @click="selectModel(model)"
-              >
-                <div class="autocomplete-model__item" :title="model">
-                  {{ model }}
-                  <v-btn
-                    v-if="isChangedModel && selectedModel === model"
-                    v-tooltip:top="'Установить по умолчанию'"
-                    color="primary"
-                    density="compact"
-                    icon="mdi-check-circle"
-                    variant="text"
-                    @click="setDefaultModel"
-                  />
-                </div>
-              </v-list-item>
+              <template v-if="chat.models?.length">
+                <v-list-item
+                  v-for="model in filteredModels"
+                  :key="model"
+                  :active="model === selectedModel"
+                  :value="model"
+                  @click="selectModel(model)"
+                >
+                  <div class="autocomplete-model__item" :title="model">
+                    {{ model }}
+                    <v-btn
+                      v-if="isChangedModel && selectedModel === model"
+                      v-tooltip:top="'Установить по умолчанию'"
+                      color="primary"
+                      density="compact"
+                      icon="mdi-check-circle"
+                      variant="text"
+                      @click="setDefaultModel"
+                    />
+                  </div>
+                </v-list-item>
+              </template>
+              <v-skeleton-loader v-else :elevation="3" type="paragraph" />
             </div>
 
             <v-text-field
@@ -250,7 +253,7 @@
       <v-btn
         class="file-btn"
         :color="attachment ? 'blue' : 'white'"
-        :disabled="chat.isSending"
+        :disabled="!chat.models?.length"
         variant="tonal"
         @click="handleAttachClick"
       >
@@ -270,7 +273,7 @@
       <v-btn
         class="search-btn"
         :color="isSearch ? 'blue' : 'white'"
-        :disabled="chat.isSending"
+        :disabled="!chat.models?.length"
         prepend-icon="mdi-magnify"
         variant="tonal"
         @click="isSearch = !isSearch"
@@ -280,7 +283,7 @@
       <v-btn
         class="send-btn"
         :color="chat.isSending ? 'error' : undefined"
-        :disabled="chat.isSending ? false : !canSend"
+        :disabled="chat.isSending || chat.models?.length ? false : !canSend"
         :icon="chat.isSending ? 'mdi-stop' : 'mdi-send'"
         size="small"
         variant="text"

@@ -9,7 +9,7 @@ import { useSettingsStore } from '@/stores/settings.ts';
 
 const throttledSaveChat = throttle(async (chat: Chat) => {
   await saveChat(chat);
-}, 500);
+}, 800);
 
 export const useChatStore = defineStore('chat', {
   state: () => {
@@ -22,6 +22,7 @@ export const useChatStore = defineStore('chat', {
       models: [] as OllamaModel[],
       chats: [] as Chat[],
       memory: [] as MemoryEntry[],
+      activeSystemPrompt: settings.systemPrompt ?? '',
       activeChatId: '',
       isGeneratingTitle: false,
       isSending: false,
@@ -96,27 +97,6 @@ export const useChatStore = defineStore('chat', {
       this.isSending = value;
     },
 
-    async addMemoryMessage (chatId: string) {
-      console.log('addMemoryMessage', chatId);
-      const chat = this.getChat(chatId);
-      if (!chat || chat.messages.length > 0) return;
-
-      await this.fetchMemory();
-      console.log(this.memory);
-      if (this.memory.length > 0) {
-        const memoryContent = this.memory
-          .map(entry => entry.content)
-          .join('\n---\n') + '\n---\n';
-        chat.messages.push({
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: `Memory context:\n${memoryContent}`,
-          timestamp: new Date().getTime(),
-        });
-        await this.persistChat(chatId);
-      }
-    },
-
     async createChat () {
       const newChat: Chat = {
         id: crypto.randomUUID(),
@@ -125,10 +105,9 @@ export const useChatStore = defineStore('chat', {
         timestamp: new Date().getTime(),
       };
 
+      await this.persistChat(newChat.id);
       this.chats.unshift(newChat);
       this.activeChatId = newChat.id;
-      await this.addMemoryMessage(newChat.id);
-      await this.persistChat(newChat.id);
 
       return newChat;
     },
@@ -295,10 +274,6 @@ export const useChatStore = defineStore('chat', {
         this.abortController?.abort();
         this.abortController = new AbortController();
 
-        if (chat.messages.length === 0) {
-          await this.addMemoryMessage(chatId);
-        }
-
         let finalContent = content;
         let images: string[] | undefined;
         let userMessageId: string | null;
@@ -442,13 +417,26 @@ export const useChatStore = defineStore('chat', {
             }
           }
         } else {
-          const body = {
-            model: this.selectedModel,
-            messages: chat.messages.map(msg => ({
+          // Формируем сообщения с добавлением системного промпта и памяти
+          const memoryContent = this.memory.length > 0
+            ? 'Memory context:\n' + this.memory.map(entry => entry.content).join('\n---\n') + '\n---\n'
+            : '';
+
+          const systemPrompt = this.activeSystemPrompt || this.settings.systemPrompt || '';
+
+          const messagesToSend = [
+            { role: 'system', content: systemPrompt },
+            ...(memoryContent ? [{ role: 'system', content: memoryContent }] : []),
+            ...chat.messages.map(msg => ({
               role: msg.role,
               content: msg.content,
               ...(msg.attachmentContent && msg.attachmentMeta?.type === AttachmentType.IMAGE ? { images: [msg.attachmentContent] } : {}),
             })),
+          ];
+
+          const body = {
+            model: this.selectedModel,
+            messages: messagesToSend,
             stream: true,
           };
 

@@ -1,94 +1,94 @@
 <script lang="ts" setup>
-import {useChatStore} from "@/stores/chat.ts";
-import {computed, onMounted, ref} from "vue";
-import {useRouter} from "vue-router";
-import {useChatActions} from "@/composables/useChatActions.ts";
-import {useAppStore} from "@/stores/app.ts";
-import {useAlert} from "@/plugins/alertPlugin.ts";
-import {useDeleteButton} from "@/composables/useDeleteButton.ts";
-import type {Chat} from "@/types/chats.ts";
-import {formatDate} from "../../utils/chatUtils.ts";
+  import { useChatStore } from '@/stores/chat.ts';
+  import { computed, onMounted, ref } from 'vue';
+  import { useRouter } from 'vue-router';
+  import { useChatActions } from '@/composables/useChatActions.ts';
+  import { useAppStore } from '@/stores/app.ts';
+  import { useAlert } from '@/plugins/alertPlugin.ts';
+  import { useDeleteButton } from '@/composables/useDeleteButton.ts';
+  import type { Chat } from '@/types/chats.ts';
+  import { formatDate } from '../../utils/chatUtils.ts';
 
-const props = defineProps<{
-  isChatPage: boolean;
-}>();
+  const props = defineProps<{
+    isChatPage: boolean;
+  }>();
 
-const router = useRouter();
-const app = useAppStore();
-const chat = useChatStore();
-const { showSnackbar, showConfirm } = useAlert();
-const { onNewChat, selectChat, deleteChat } = useChatActions();
-const { handleFirstClick, handleSecondClick, resetDeletePending, isPending } = useDeleteButton(deleteChat);
+  const router = useRouter();
+  const app = useAppStore();
+  const chat = useChatStore();
+  const { showSnackbar, showConfirm } = useAlert();
+  const { onNewChat, selectChat, deleteChat } = useChatActions();
+  const { handleFirstClick, handleSecondClick, resetDeletePending, isPending } = useDeleteButton(deleteChat);
 
-const searchQuery = ref<string>('');
+  const searchQuery = ref<string>('');
 
-const groupedChats = computed(() => {
-  const groups: { [key: string]: Chat[] } = {};
-  const sortedChats = [...chat.chats]
-    .filter((chat) => chat.title.toLowerCase().includes(searchQuery.value?.toLowerCase() || ''))
-    .sort((a, b) => b.timestamp - a.timestamp);
+  const groupedChats = computed(() => {
+    const groups: { [key: string]: Chat[] } = {};
+    const sortedChats = [...chat.chats]
+      .filter(chat => chat.title.toLowerCase().includes(searchQuery.value?.toLowerCase() || ''))
+      .sort((a, b) => b.timestamp - a.timestamp);
 
-  sortedChats.forEach((chat) => {
-    const date = new Date(chat.timestamp);
-    const dateKey = date.toDateString();
-    if (!groups[dateKey]) {
-      groups[dateKey] = [];
-    }
-    groups[dateKey].push(chat);
+    sortedChats.forEach(chat => {
+      const date = new Date(chat.timestamp);
+      const dateKey = date.toDateString();
+      if (!groups[dateKey]) {
+        groups[dateKey] = [];
+      }
+      groups[dateKey].push(chat);
+    });
+
+    return Object.entries(groups).map(([dateKey, chats]) => ({
+      date: new Date(dateKey),
+      chats,
+    }));
   });
 
-  return Object.entries(groups).map(([dateKey, chats]) => ({
-    date: new Date(dateKey),
-    chats,
-  }));
-});
+  const handleChatClick = (id: string) => {
+    selectChat(id);
+  };
 
-const handleChatClick = (id: string) => {
-  selectChat(id);
-};
-
-const toggleSettings = async () => {
-  if (props.isChatPage) {
-    router.push(`/settings`);
-  } else {
-    const activeChat = chat.activeChat;
-
-    if (activeChat) {
-      router.push(`/#${activeChat.id}`);
+  const toggleSettings = async () => {
+    if (props.isChatPage) {
+      router.push(`/settings`);
     } else {
-      onNewChat();
+      const activeChat = chat.activeChat;
+
+      if (activeChat) {
+        router.push(`/#${activeChat.id}`);
+      } else {
+        onNewChat();
+      }
     }
-  }
-};
+  };
 
-const initializeChat = () => {
-  const hash = window.location.hash.slice(1);
-  if (hash && chat.chats.some((chat) => chat.id === hash)) {
-    selectChat(hash);
-    return;
-  }
+  const initializeChat = () => {
+    const hash = window.location.hash.slice(1);
+    if (hash && chat.chats.some(chat => chat.id === hash)) {
+      selectChat(hash);
+      return;
+    }
 
-  if (chat.chats.length > 0) {
-    selectChat(chat.chats[0].id);
-  }
-};
+    if (chat.chats.length > 0) {
+      selectChat(chat.chats[0].id);
+    }
+  };
 
-const removeAllChats = async () => {
-  showConfirm({
-    title: 'Предупреждение',
-    message: 'Вы действительно хотите удалить все чаты?',
-    buttons: [
-      { text: 'Да', color: 'warning', value: true },
-      { text: 'Отмена', color: 'white', value: false },
-    ],
-    resolve: () => {
-      chat.clearChats();
-      showSnackbar({ message: 'Все чаты успешно удалены', type: 'success' });
-    },
-  });
-};
+  const removeAllChats = async () => {
+    showConfirm({
+      title: 'Предупреждение',
+      message: 'Вы действительно хотите удалить все чаты?',
+      buttons: [
+        { text: 'Да', color: 'warning', value: true },
+        { text: 'Отмена', color: 'white', value: false },
+      ],
+      resolve: () => {
+        chat.clearChats();
+        showSnackbar({ message: 'Все чаты успешно удалены', type: 'success' });
+      },
+    });
+  };
 
-onMounted(initializeChat);
+  onMounted(initializeChat);
 </script>
 
 <template>
@@ -111,51 +111,54 @@ onMounted(initializeChat);
     <transition name="fade">
       <div v-if="app.isAsideOpen && isChatPage" class="chats-container">
         <v-text-field
-          class="chats-search-input"
           v-model="searchQuery"
+          class="chats-search-input"
+          clearable
+          hide-details="auto"
           label="Поиск"
           variant="solo-inverted"
-          hide-details="auto"
-          clearable
         >
-          <template v-slot:append-inner>
+          <template #append-inner>
             <v-btn
-              icon="mdi-trash-can"
-              color="red"
-              variant="plain"
               v-tooltip="'Удалить все чаты'"
+              color="red"
+              icon="mdi-trash-can"
+              variant="plain"
               @click="removeAllChats"
             />
           </template>
         </v-text-field>
 
         <div class="chat-list">
-          <div v-for="group in groupedChats" :key="group.date.toString()" class="chat-group">
-            <div class="date-divider">{{ formatDate(group.date.getTime()) }}</div>
-            <div
-              v-for="_chat in group.chats"
-              :key="_chat.id"
-              :class="['chat-item', { 'chat-item--selected': chat.activeChatId === _chat.id }]"
-              @click="handleChatClick(_chat.id)"
-            >
-              <span>{{ _chat.title }}</span>
-              <v-btn
-                class="delete-btn"
-                :color="isPending(_chat.id) ? 'red' : ''"
-                icon="mdi-delete"
-                size="small"
-                @click.stop="isPending(_chat.id) ? handleSecondClick(_chat.id) : handleFirstClick(_chat.id)"
-                @mouseleave="resetDeletePending"
-              />
+          <template v-if="chat.chats?.length > 0">
+            <div v-for="group in groupedChats" :key="group.date.toString()" class="chat-group">
+              <div class="date-divider">{{ formatDate(group.date.getTime()) }}</div>
+              <div
+                v-for="_chat in group.chats"
+                :key="_chat.id"
+                :class="['chat-item', { 'chat-item--selected': chat.activeChatId === _chat.id }]"
+                @click="handleChatClick(_chat.id)"
+              >
+                <span>{{ _chat.title }}</span>
+                <v-btn
+                  class="delete-btn"
+                  :color="isPending(_chat.id) ? 'red' : ''"
+                  icon="mdi-delete"
+                  size="small"
+                  @click.stop="isPending(_chat.id) ? handleSecondClick(_chat.id) : handleFirstClick(_chat.id)"
+                  @mouseleave="resetDeletePending"
+                />
+              </div>
             </div>
-          </div>
+          </template>
+          <v-skeleton-loader v-else :elevation="3" type="paragraph@3" />
         </div>
       </div>
     </transition>
 
     <v-btn
-      :color="!isChatPage ? 'blue' : ''"
       class="settings-btn"
+      :color="!isChatPage ? 'blue' : ''"
       icon="mdi-wrench"
       @click="toggleSettings"
     />

@@ -10,6 +10,8 @@ export const DEFAULT_SETTINGS = {
   theme: 'dark' as Theme,
   isSearchAsDefault: false as boolean,
   chatScrollMode: 'scroll' as 'gap' | 'scroll',
+  systemPrompt: '',
+  presetsPrompts: [],
   systemModel: 'llama3.2:latest',
   titlePrompt: 'You are an assistant that generates a concise chat title based on a user message and assistant response. Return a JSON object with a "title" field containing a short, descriptive title (max 50 characters) summarizing the conversation topic.' as string,
   memoryPrompt: `You are an AI assistant tasked with summarizing key factual information about the user from a short conversation for long-term memory storage. The conversation includes messages where "user" is the human and "assistant" is the AI. Your goal is to extract concise, self-contained facts about the user, focusing on their preferences, background, or notable details explicitly mentioned.

@@ -1,9 +1,9 @@
-import {useChatStore} from '@/stores/chat';
-import type {Chat} from "@/types/chats.ts";
-import {useAppRouting} from "@/composables/useAppRouting.ts";
-import {useSettingsStore} from "@/stores/settings.ts";
+import { useChatStore } from '@/stores/chat';
+import type { Chat } from '@/types/chats.ts';
+import { useAppRouting } from '@/composables/useAppRouting.ts';
+import { useSettingsStore } from '@/stores/settings.ts';
 
-export function useChatActions() {
+export function useChatActions () {
   const chat = useChatStore();
   const { settings } = useSettingsStore();
   const { currentChatId, navigateWithHash } = useAppRouting();
@@ -28,9 +28,7 @@ export function useChatActions() {
   const selectChat = async (chatId: string) => {
     try {
       let tries = 10;
-      let interval: number;
-
-      interval = setInterval(async () => {
+      const interval = setInterval(async () => {
         if (tries <= 0) {
           clearInterval(interval);
         }
@@ -80,6 +78,6 @@ export function useChatActions() {
     onNewChat,
     selectChat,
     deleteChat,
-    initFromHash
+    initFromHash,
   };
 }
