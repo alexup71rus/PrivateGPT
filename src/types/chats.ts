@@ -1,26 +1,31 @@
 export type MemoryEntry = { id?: number; content: string; timestamp: number };
 
-export interface ChatModel {
-  name: string;
+export enum AttachmentType {
+  TEXT = 'TEXT',
+  IMAGE = 'IMAGE'
 }
 
-export interface Attachment { content: string, type: 'text' | 'image', meta: File }
+export interface Attachment {
+  content: string;
+  type: AttachmentType;
+  meta: File;
+}
 
-export type AttachmentMeta = {
-  type: 'text' | 'image';
+export interface AttachmentMeta {
+  type: AttachmentType;
   name: string;
   size: number;
   lastModified: number;
-};
+}
 
 export interface Message {
   id: string;
-  role: 'user' | 'assistant';
   content: string;
+  role: 'user' | 'assistant';
+  timestamp: number;
+  attachmentMeta?: AttachmentMeta | null;
+  attachmentContent?: string | null;
   isLoading?: boolean;
-  attachmentMeta?: AttachmentMeta;
-  attachmentContent?: string;
-  timestamp?: number;
   thinkTime?: number;
   isThinking?: boolean;
 }

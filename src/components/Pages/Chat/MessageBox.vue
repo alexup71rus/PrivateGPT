@@ -1,160 +1,163 @@
 <script lang="ts" setup>
-import {computed, nextTick, onMounted, ref, watch} from "vue";
-import {useChatStore} from "@/stores/chat.ts";
-import type {Attachment, AttachmentMeta, ChatModel} from "@/types/chats.ts";
-import {useSettingsStore} from "@/stores/settings.ts";
+  import { computed, nextTick, onMounted, ref, watch } from 'vue';
+  import { useChatStore } from '@/stores/chat.ts';
+  import { type Attachment, type AttachmentMeta, AttachmentType, type ChatModel } from '@/types/chats.ts';
+  import { useSettingsStore } from '@/stores/settings.ts';
 
-const chat = useChatStore();
-const { settings, updateSettings } = useSettingsStore();
-const textareaRef = ref<HTMLTextAreaElement>();
-const fileInputRef = ref<HTMLInputElement>();
-const activeChat = computed(() => chat.activeChat);
-const activeChatId = computed(() => chat.activeChatId);
-const messageText = ref('');
-const attachment = ref<File | null>(null);
-const attachmentContent = ref<{ content: string, type: 'text' | 'image', meta: AttachmentMeta } | null>(null);
-const isSearch = ref(settings.isSearchAsDefault);
-const canSend = computed(() => chat.isSending ? false : messageText.value.trim());
+  const chat = useChatStore();
+  const { settings, updateSettings } = useSettingsStore();
+  const textareaRef = ref<HTMLTextAreaElement>();
+  const fileInputRef = ref<HTMLInputElement>();
+  const activeChat = computed(() => chat.activeChat);
+  const activeChatId = computed(() => chat.activeChatId);
+  const messageText = ref('');
+  const attachment = ref<File | null>(null);
+  const attachmentContent = ref<{ content: string, type: AttachmentType, meta: AttachmentMeta } | null>(null);
+  const isSearch = ref(settings.isSearchAsDefault);
+  const canSend = computed(() => chat.isSending ? false : messageText.value.trim());
 
-const modelNames = computed(() => chat.models?.map((model: ChatModel) => model.name) || []);
-const selectedModel = ref(settings.selectedModel || settings.defaultModel);
-const isChangedModel = computed(() => selectedModel.value !== settings.defaultModel);
-const setDefaultModel = () => {
-  if (selectedModel.value) {
-    updateSettings({ defaultModel: selectedModel.value });
+  const modelNames = computed(() => chat.models?.map((model: ChatModel) => model.name) || []);
+  const selectedModel = ref(settings.selectedModel || settings.defaultModel);
+  const isChangedModel = computed(() => selectedModel.value !== settings.defaultModel);
+  const setDefaultModel = () => {
+    if (selectedModel.value) {
+      updateSettings({ defaultModel: selectedModel.value });
+    }
+  };
+  const modelSearch = ref('');
+  const filteredModels = computed(() =>
+    modelSearch.value
+      ? modelNames.value.filter(name =>
+        name.toLowerCase().includes(modelSearch.value.toLowerCase()))
+      : modelNames.value
+  );
+
+  function selectModel (model: string) {
+    selectedModel.value = model;
+    updateSettings({ selectedModel: selectedModel.value });
   }
-};
-const modelSearch = ref('');
-const filteredModels = computed(() =>
-  modelSearch.value
-    ? modelNames.value.filter(name =>
-      name.toLowerCase().includes(modelSearch.value.toLowerCase()))
-    : modelNames.value
-);
 
-function selectModel(model: string) {
-  selectedModel.value = model;
-  updateSettings({ selectedModel: selectedModel.value });
-}
+  function handleAttachClick () {
+    fileInputRef.value?.click();
+  }
 
-function handleAttachClick() {
-  fileInputRef.value?.click();
-}
+  function handleFilesSelected (event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
 
-function handleFilesSelected(event: Event) {
-  const input = event.target as HTMLInputElement;
-  const file = input.files?.[0];
+    if (!file) return;
 
-  if (!file) return;
+    const isImage = /\.(png|jpe?g)$/i.test(file.name);
+    const reader = new FileReader();
 
-  const isImage = /\.(png|jpe?g)$/i.test(file.name);
-  const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
 
-  reader.onload = () => {
-    const result = reader.result as string;
+      if (isImage) {
+        const img = new Image();
+        img.src = result;
+        img.onload = () => {
+          let width = img.width;
+          let height = img.height;
+          const maxWidth = 1024;
+          const maxHeight = 768;
 
-    if (isImage) {
-      const img = new Image();
-      img.src = result;
-      img.onload = () => {
-        let width = img.width;
-        let height = img.height;
-        const maxWidth = 1024;
-        const maxHeight = 768;
+          if (width > maxWidth || height > maxHeight) {
+            const ratio = Math.min(maxWidth / width, maxHeight / height);
+            width = Math.round(width * ratio);
+            height = Math.round(height * ratio);
+          }
 
-        if (width > maxWidth || height > maxHeight) {
-          const ratio = Math.min(maxWidth / width, maxHeight / height);
-          width = Math.round(width * ratio);
-          height = Math.round(height * ratio);
-        }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d')!;
+          ctx.drawImage(img, 0, 0, width, height);
 
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d')!;
-        ctx.drawImage(img, 0, 0, width, height);
+          const base64 = canvas.toDataURL('image/jpeg', 0.8);
+          const compressedBase64 = base64.split(',')[1];
 
-        const base64 = canvas.toDataURL('image/jpeg', 0.8);
-        const compressedBase64 = base64.split(',')[1];
-
+          attachmentContent.value = {
+            content: compressedBase64,
+            type: AttachmentType.IMAGE,
+            meta: {
+              name: file.name,
+              size: file.size,
+              type: AttachmentType.IMAGE,
+              lastModified: file.lastModified,
+            },
+          };
+        };
+      } else {
         attachmentContent.value = {
-          content: compressedBase64,
-          type: 'image',
+          content: result,
+          type: AttachmentType.TEXT,
           meta: {
             name: file.name,
             size: file.size,
-            type: 'image',
+            type: AttachmentType.TEXT,
             lastModified: file.lastModified,
           },
         };
-      };
+      }
+
+      attachment.value = file;
+    };
+
+    if (isImage) {
+      reader.readAsDataURL(file);
     } else {
-      attachmentContent.value = { content: result, type: 'text', meta: {
-            name: file.name,
-            size: file.size,
-            type: 'text',
-            lastModified: file.lastModified,
-          }
-      };
+      reader.readAsText(file);
     }
 
-    attachment.value = file;
-  };
-
-  if (isImage) {
-    reader.readAsDataURL(file);
-  } else {
-    reader.readAsText(file);
+    input.value = '';
   }
 
-  input.value = '';
-}
-
-function removeAttachment() {
-  attachment.value = null;
-  attachmentContent.value = null;
-  nextTick(() => textareaRef.value?.focus());
-}
-
-function onFormSubmit(event: Event) {
-  event.preventDefault();
-  sendMessage();
-}
-
-async function sendMessage() {
-  if (!canSend.value) return;
-
-  chat.setIsSending(true);
-  try {
-    await chat.sendMessage(activeChatId.value, messageText.value, { ...attachmentContent.value } as Attachment);
-    messageText.value = '';
+  function removeAttachment () {
     attachment.value = null;
     attachmentContent.value = null;
-  } finally {
-    chat.setIsSending(false);
+    nextTick(() => textareaRef.value?.focus());
   }
-}
 
-async function stopGeneration() {
-  if (chat.abortController) {
-    chat.abortController.abort();
-    chat.setIsSending(false);
+  function onFormSubmit (event: Event) {
+    event.preventDefault();
+    sendMessage();
+  }
 
-    const lastMessage = activeChat.value?.messages[activeChat.value.messages.length - 1];
-    if (lastMessage?.isLoading) {
-      await chat.updateMessage(activeChatId.value, lastMessage.id, lastMessage.content, false, lastMessage.thinkTime, false);
+  async function sendMessage () {
+    if (!canSend.value) return;
+
+    chat.setIsSending(true);
+    try {
+      await chat.sendMessage(activeChatId.value, messageText.value, { ...attachmentContent.value } as Attachment);
+      messageText.value = '';
+      attachment.value = null;
+      attachmentContent.value = null;
+    } finally {
       chat.setIsSending(false);
     }
   }
-}
 
-onMounted(() => {
-  nextTick(() => textareaRef.value?.focus());
-});
+  async function stopGeneration () {
+    if (chat.abortController) {
+      chat.abortController.abort();
+      chat.setIsSending(false);
 
-watch(() => [chat.activeChatId, chat.isSending, chat.selectedModel], (newVal, oldVal) => {
-  nextTick(() => textareaRef.value?.focus());
-}, { deep: true })
+      const lastMessage = activeChat.value?.messages[activeChat.value.messages.length - 1];
+      if (lastMessage?.isLoading) {
+        await chat.updateMessage(activeChatId.value, lastMessage.id, lastMessage.content, false, lastMessage.thinkTime, false);
+        chat.setIsSending(false);
+      }
+    }
+  }
+
+  onMounted(() => {
+    nextTick(() => textareaRef.value?.focus());
+  });
+
+  watch(() => [chat.activeChatId, chat.isSending, chat.selectedModel], (newVal, oldVal) => {
+    nextTick(() => textareaRef.value?.focus());
+  }, { deep: true })
 </script>
 
 <template>
@@ -164,16 +167,16 @@ watch(() => [chat.activeChatId, chat.isSending, chat.selectedModel], (newVal, ol
       hidden
       type="file"
       @change="handleFilesSelected"
-    />
+    >
 
     <div class="chat-input-container">
       <v-textarea
         ref="textareaRef"
         v-model="messageText"
-        :disabled="chat.isSending"
         auto-grow
         class="chat-input"
         density="comfortable"
+        :disabled="chat.isSending"
         hide-details
         placeholder="Введите сообщение..."
         rows="1"
@@ -184,15 +187,15 @@ watch(() => [chat.activeChatId, chat.isSending, chat.selectedModel], (newVal, ol
     </div>
 
     <div class="chat-input-actions">
-      <v-menu location="top" :close-on-content-click="false">
+      <v-menu :close-on-content-click="false" location="top">
         <template #activator="{ props }">
           <v-btn
             v-bind="props"
-            :color="isChangedModel ? 'primary' : 'white'"
-            class="model-btn"
-            variant="tonal"
-            prepend-icon="mdi-robot"
             append-icon="mdi-chevron-down"
+            class="model-btn"
+            :color="isChangedModel ? 'primary' : 'white'"
+            prepend-icon="mdi-robot"
+            variant="tonal"
           >
             {{ selectedModel || 'Модель' }}
           </v-btn>
@@ -203,8 +206,8 @@ watch(() => [chat.activeChatId, chat.isSending, chat.selectedModel], (newVal, ol
             <div class="autocomplete-model__list">
               <v-list-item
                 v-for="model in filteredModels"
-                :active="model === selectedModel"
                 :key="model"
+                :active="model === selectedModel"
                 :value="model"
                 @click="selectModel(model)"
               >
@@ -212,12 +215,12 @@ watch(() => [chat.activeChatId, chat.isSending, chat.selectedModel], (newVal, ol
                   {{ model }}
                   <v-btn
                     v-if="isChangedModel && selectedModel === model"
+                    v-tooltip:top="'Установить по умолчанию'"
+                    color="primary"
+                    density="compact"
                     icon="mdi-check-circle"
                     variant="text"
-                    density="compact"
-                    color="primary"
                     @click="setDefaultModel"
-                    v-tooltip:top="'Установить по умолчанию'"
                   />
                 </div>
               </v-list-item>
@@ -225,29 +228,29 @@ watch(() => [chat.activeChatId, chat.isSending, chat.selectedModel], (newVal, ol
 
             <v-text-field
               v-model="modelSearch"
-              placeholder="Фильтр моделей"
+              class="mb-2"
+              clearable
               dense
               hide-details
-              clearable
+              placeholder="Фильтр моделей"
               variant="solo-filled"
-              class="mb-2"
             />
           </v-card-text>
         </v-card>
       </v-menu>
       <v-btn
         v-if="isChangedModel"
-        :color="'red'"
         class="model-btn"
-        variant="tonal"
+        :color="'red'"
         icon="mdi-backup-restore"
+        variant="tonal"
         @click="selectModel(settings.defaultModel)"
       />
       <v-spacer />
       <v-btn
+        class="file-btn"
         :color="attachment ? 'blue' : 'white'"
         :disabled="chat.isSending"
-        class="file-btn"
         variant="tonal"
         @click="handleAttachClick"
       >
@@ -265,9 +268,9 @@ watch(() => [chat.activeChatId, chat.isSending, chat.selectedModel], (newVal, ol
         />
       </v-btn>
       <v-btn
+        class="search-btn"
         :color="isSearch ? 'blue' : 'white'"
         :disabled="chat.isSending"
-        class="search-btn"
         prepend-icon="mdi-magnify"
         variant="tonal"
         @click="isSearch = !isSearch"
@@ -275,10 +278,10 @@ watch(() => [chat.activeChatId, chat.isSending, chat.selectedModel], (newVal, ol
         Поиск
       </v-btn>
       <v-btn
+        class="send-btn"
         :color="chat.isSending ? 'error' : undefined"
         :disabled="chat.isSending ? false : !canSend"
         :icon="chat.isSending ? 'mdi-stop' : 'mdi-send'"
-        class="send-btn"
         size="small"
         variant="text"
         @click="chat.isSending ? stopGeneration() : onFormSubmit($event)"

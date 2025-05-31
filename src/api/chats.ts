@@ -1,8 +1,7 @@
 import { getGraphQLClient, handleGraphQLError } from '@/utils/graphql';
 import { gql } from 'graphql-tag';
-import type { Chat, MemoryEntry } from '@/types/chats.ts';
+import { AttachmentType, type Chat, type MemoryEntry } from '@/types/chats.ts';
 
-// Load all chats from the backend
 export async function loadChats (): Promise<Chat[]> {
   try {
     const client = await getGraphQLClient();
@@ -36,7 +35,6 @@ export async function loadChats (): Promise<Chat[]> {
   }
 }
 
-// Save multiple chats to the backend
 export async function saveChats (chats: Chat[]): Promise<void> {
   try {
     const client = await getGraphQLClient();
@@ -48,7 +46,6 @@ export async function saveChats (chats: Chat[]): Promise<void> {
           }
         }
       `;
-      // Ensure chat is serializable, exclude UI-specific fields
       const serializableChat = {
         id: chat.id,
         title: chat.title,
@@ -60,7 +57,7 @@ export async function saveChats (chats: Chat[]): Promise<void> {
           timestamp: message.timestamp,
           attachmentMeta: message.attachmentMeta
             ? {
-              type: message.attachmentMeta.type,
+              type: message.attachmentMeta.type === AttachmentType.TEXT ? AttachmentType.TEXT : AttachmentType.IMAGE,
               name: message.attachmentMeta.name,
               size: message.attachmentMeta.size,
               lastModified: message.attachmentMeta.lastModified,
@@ -76,7 +73,6 @@ export async function saveChats (chats: Chat[]): Promise<void> {
   }
 }
 
-// Save a single chat to the backend
 export async function saveChat (chat: Chat): Promise<void> {
   try {
     const client = await getGraphQLClient();
@@ -87,7 +83,6 @@ export async function saveChat (chat: Chat): Promise<void> {
         }
       }
     `;
-    // Ensure chat is serializable, exclude UI-specific fields
     const serializableChat = JSON.parse(JSON.stringify({
       id: chat.id,
       title: chat.title,
@@ -99,7 +94,7 @@ export async function saveChat (chat: Chat): Promise<void> {
         timestamp: message.timestamp,
         attachmentMeta: message.attachmentMeta
           ? {
-            type: message.attachmentMeta.type,
+            type: message.attachmentMeta.type === AttachmentType.TEXT ? AttachmentType.TEXT : AttachmentType.IMAGE,
             name: message.attachmentMeta.name,
             size: message.attachmentMeta.size,
             lastModified: message.attachmentMeta.lastModified,
@@ -114,7 +109,6 @@ export async function saveChat (chat: Chat): Promise<void> {
   }
 }
 
-// Delete a chat by ID
 export async function deleteChat (chatId: string): Promise<void> {
   try {
     const client = await getGraphQLClient();
@@ -129,7 +123,6 @@ export async function deleteChat (chatId: string): Promise<void> {
   }
 }
 
-// Clear all chats
 export async function clearAllChats (): Promise<void> {
   try {
     const client = await getGraphQLClient();
@@ -144,7 +137,6 @@ export async function clearAllChats (): Promise<void> {
   }
 }
 
-// Load memory entries from the backend
 export async function loadMemory (): Promise<MemoryEntry[]> {
   try {
     const client = await getGraphQLClient();
@@ -165,13 +157,12 @@ export async function loadMemory (): Promise<MemoryEntry[]> {
   }
 }
 
-// Save memory entries to the backend
 export async function saveMemory (memory: MemoryEntry[]): Promise<void> {
   try {
     const client = await getGraphQLClient();
     const mutation = gql`
-      mutation SaveMemory($entries: [MemoryEntryInput!]!) {
-        saveMemory(entries: $entries) {
+      mutation($entries: [MemoryEntryInput!]!) {
+        saveMemoryEntries(entries: $entries) {
           id
         }
       }

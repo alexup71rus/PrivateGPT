@@ -1,25 +1,24 @@
 <script lang="ts" setup>
-import type { AttachmentMeta } from '@/types/chats';
-import { ref } from 'vue';
+  import { type AttachmentMeta, AttachmentType } from '@/types/chats';
 
-defineProps<{
-  meta: AttachmentMeta;
-  content: string;
-}>();
+  defineProps<{
+    meta: AttachmentMeta;
+    content: string;
+  }>();
 
-defineEmits<{
-  (e: 'update:modelValue', value: boolean): void;
-}>();
+  defineEmits<{
+    (e: 'update:modelValue', value: boolean): void;
+  }>();
 </script>
 
 <template>
   <v-dialog
     class="attachment-preview"
     max-width="800px"
-    @update:modelValue="$emit('update:modelValue', $event)"
+    @update:model-value="$emit('update:modelValue', $event)"
   >
-    <div v-if="meta.type === 'image'" class="image-preview">
-      <img :src="`data:image/${meta.type.split('/')[1] || 'jpeg'};base64,${content}`" alt="Attachment" />
+    <div v-if="meta.type === AttachmentType.IMAGE" class="image-preview">
+      <img alt="Attachment" :src="`data:image/${meta.type.split('/')[1] || 'jpeg'};base64,${content}`">
     </div>
     <pre
       v-else

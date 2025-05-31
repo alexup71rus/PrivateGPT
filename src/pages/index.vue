@@ -1,31 +1,31 @@
 <script lang="ts" setup>
-import { computed, ref, watch } from "vue";
-import { useChatStore } from "@/stores/chat.ts";
-import { useChatScroll } from "@/composables/useChatScroll.ts";
-import { useAppStore } from "@/stores/app.ts";
-import { useSettingsStore } from "@/stores/settings.ts";
+  import { computed, ref, watch } from 'vue';
+  import { useChatStore } from '@/stores/chat.ts';
+  import { useChatScroll } from '@/composables/useChatScroll.ts';
+  import { useAppStore } from '@/stores/app.ts';
+  import { useSettingsStore } from '@/stores/settings.ts';
 
-const app = useAppStore();
-const chat = useChatStore();
-const settings = useSettingsStore();
-const chatTitle = ref(chat.activeChat?.title ?? '');
-const messages = computed(() => chat.activeChat?.messages ?? []);
-const isLoading = computed(() =>
-  chat.activeChat?.messages[chat.activeChat.messages.length - 1]?.role === 'user' && chat.isSending
-);
-const { chatMessagesRef, chatGap, isShowScrollDown, scrollDown, updateActiveChatId } = useChatScroll(messages, chat.activeChatId);
+  const app = useAppStore();
+  const chat = useChatStore();
+  const settings = useSettingsStore();
+  const chatTitle = ref(chat.activeChat?.title ?? '');
+  const messages = computed(() => chat.activeChat?.messages ?? []);
+  const isLoading = computed(() =>
+    chat.activeChat?.messages[chat.activeChat.messages.length - 1]?.role === 'user' && chat.isSending
+  );
+  const { chatMessagesRef, chatGap, isShowScrollDown, scrollDown, updateActiveChatId } = useChatScroll(messages, chat.activeChatId);
 
-watch(() => chatTitle.value || '', (newTitle: string) => {
-  chat.renameChat(chat.activeChatId, newTitle);
-});
+  watch(() => chatTitle.value || '', (newTitle: string) => {
+    chat.renameChat(chat.activeChatId, newTitle);
+  });
 
-watch(() => chat.activeChat?.title || '', (newTitle: string) => {
-  chatTitle.value = newTitle;
-});
+  watch(() => chat.activeChat?.title || '', (newTitle: string) => {
+    chatTitle.value = newTitle;
+  });
 
-watch(() => chat.activeChatId, (newId: string) => {
-  updateActiveChatId(newId);
-});
+  watch(() => chat.activeChatId, (newId: string) => {
+    updateActiveChatId(newId);
+  });
 </script>
 
 <template>
@@ -34,10 +34,10 @@ watch(() => chat.activeChatId, (newId: string) => {
       <v-text-field
         v-model="chatTitle"
         :disabled="!chat.activeChat?.id || chat.isGeneratingTitle"
+        hide-details="auto"
         label="Заголовок чата"
         variant="solo"
-        hide-details="auto"
-      ></v-text-field>
+      />
     </div>
 
     <div ref="chatMessagesRef" class="chat-messages" :style="{ paddingBottom: `${chatGap}px` }">
@@ -54,7 +54,7 @@ watch(() => chat.activeChatId, (newId: string) => {
           <v-progress-circular
             color="primary"
             indeterminate
-          ></v-progress-circular>
+          />
         </div>
       </template>
       <template v-else>
@@ -70,11 +70,11 @@ watch(() => chat.activeChatId, (newId: string) => {
       <v-btn
         v-show="isShowScrollDown"
         class="chat-scroll-down"
-        variant="elevated"
         color="blue"
         icon="mdi-arrow-collapse-down"
+        variant="elevated"
         @click="scrollDown(true)"
-      ></v-btn>
+      />
     </v-fade-transition>
 
     <MessageBox class="message-box" />

@@ -15,6 +15,19 @@ export class MessageEntity {
   @Column({ nullable: true })
   timestamp: number;
 
-  @ManyToOne(() => ChatEntity, (chat) => chat.messages)
+  @Column({ type: 'json', nullable: true })
+  attachmentMeta?: {
+    type: 'TEXT' | 'IMAGE';
+    name: string;
+    size: number;
+    lastModified: number;
+  };
+
+  @Column({ type: 'text', nullable: true })
+  attachmentContent?: string;
+
+  @ManyToOne(() => ChatEntity, (chat) => chat.messages, {
+    onDelete: 'CASCADE',
+  })
   chat: ChatEntity;
 }
