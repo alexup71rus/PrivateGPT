@@ -2,6 +2,17 @@ import { getGraphQLClient, handleGraphQLError } from '@/utils/graphql';
 import { gql } from 'graphql-tag';
 import { AttachmentType, type Chat, type MemoryEntry } from '@/types/chats.ts';
 
+export async function checkBackendHealth () {
+  const client = await getGraphQLClient();
+  const query = `
+    query {
+      healthCheck
+    }
+  `;
+
+  await client.request(query);
+}
+
 export async function loadChats (): Promise<Chat[]> {
   try {
     const client = await getGraphQLClient();

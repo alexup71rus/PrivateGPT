@@ -5,6 +5,9 @@ import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
 import { join } from 'path';
 import Database from 'better-sqlite3';
 import { ChatsModule } from './chats/chats.module';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { AppResolver } from './app.resolver';
 
 @Module({
   imports: [
@@ -24,5 +27,7 @@ import { ChatsModule } from './chats/chats.module';
 
     ChatsModule,
   ],
+  controllers: [AppController],
+  providers: [AppService, AppResolver],
 })
 export class AppModule {}

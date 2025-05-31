@@ -1,6 +1,14 @@
 import { defineStore } from 'pinia';
 import { useHttpService } from '@/plugins/httpPlugin';
-import { clearAllChats, deleteChat, loadChats, loadMemory, saveChat, saveMemory } from '@/api/chats';
+import {
+  checkBackendHealth,
+  clearAllChats,
+  deleteChat,
+  loadChats,
+  loadMemory,
+  saveChat,
+  saveMemory,
+} from '@/api/chats';
 import type { OllamaModel, OllamaTagsResponse } from '@/types/ollama.ts';
 import { type Attachment, AttachmentType, type Chat, type MemoryEntry, type Message } from '@/types/chats.ts';
 import { throttle } from '@/utils/helpers.ts';
@@ -41,14 +49,14 @@ export const useChatStore = defineStore('chat', {
   },
   actions: {
     async initialize () {
-      await this.fetchChats();
-      await this.fetchMemory();
+      await Promise.all([this.fetchChats(), this.fetchMemory()]);
     },
 
     async fetchChats () {
       this.loading = true;
       this.error = null;
       try {
+        await this.waitForBackend();
         this.chats = await loadChats();
       } catch (err: any) {
         this.error = err.message;
@@ -61,11 +69,27 @@ export const useChatStore = defineStore('chat', {
       this.loading = true;
       this.error = null;
       try {
+        await this.waitForBackend();
         this.memory = await loadMemory();
       } catch (err: any) {
         this.error = err.message;
       } finally {
         this.loading = false;
+      }
+    },
+
+    async waitForBackend (maxRetries = 10, delay = 1000) {
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          await checkBackendHealth();
+          return;
+        } catch (err) {
+          if (attempt === maxRetries) {
+            throw new Error('Backend is not available after maximum retries');
+          }
+
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
       }
     },
 
