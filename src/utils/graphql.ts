@@ -7,3 +7,8 @@ export const getGraphQLClient = async () => {
   const endpoint = `http://localhost:${port}/graphql`;
   return new GraphQLClient(endpoint, { headers: {} });
 };
+
+export const handleGraphQLError = (error: any) => {
+  console.error('GraphQL Error:', error);
+  throw new Error(error.message || 'GraphQL request failed');
+};

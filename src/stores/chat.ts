@@ -1,11 +1,11 @@
-import {defineStore} from 'pinia';
-import {useHttpService} from '@/plugins/httpPlugin';
-import type {OllamaModel, OllamaTagsResponse} from '@/types/ollama.ts';
-import type {Attachment, AttachmentMeta, Chat, MemoryEntry, Message} from '@/types/chats.ts';
-import {throttle} from '@/utils/helpers.ts';
-import type {ISettings} from '@/types/settings.ts';
-import {clearAllChats, deleteChat, loadChats, loadMemory, saveChat, saveMemory} from '@/utils/storage.ts';
-import {useSettingsStore} from "@/stores/settings.ts";
+import { defineStore } from 'pinia';
+import { useHttpService } from '@/plugins/httpPlugin';
+import type { OllamaModel, OllamaTagsResponse } from '@/types/ollama.ts';
+import type { Attachment, AttachmentMeta, Chat, MemoryEntry, Message } from '@/types/chats.ts';
+import { throttle } from '@/utils/helpers.ts';
+import type { ISettings } from '@/types/settings.ts';
+import { clearAllChats, deleteChat, loadChats, loadMemory, saveChat, saveMemory } from '@/utils/storage.ts';
+import { useSettingsStore } from '@/stores/settings.ts';
 
 const throttledSaveChat = throttle(async (chat: Chat) => {
   await saveChat(chat);
@@ -29,20 +29,20 @@ export const useChatStore = defineStore('chat', {
     };
   },
   getters: {
-    activeChat(state): Chat | undefined {
+    activeChat (state): Chat | undefined {
       return state.chats.find(chat => chat.id === state.activeChatId);
     },
-    selectedModel(): string {
+    selectedModel (): string {
       return this.settings.selectedModel || this.settings.defaultModel || this.models[0]?.name || '';
     },
   },
   actions: {
-    async initialize() {
+    async initialize () {
       this.chats = await loadChats();
       this.memory = await loadMemory();
     },
 
-    async persistChat(chatId: string) {
+    async persistChat (chatId: string) {
       try {
         const chat = this.getChat(chatId);
         if (chat) {
@@ -53,28 +53,28 @@ export const useChatStore = defineStore('chat', {
       }
     },
 
-    getChat(chatId: string): Chat | undefined {
+    getChat (chatId: string): Chat | undefined {
       return this.chats.find(c => c.id === chatId);
     },
 
-    getMessage(chatId: string, messageId: string): Message | undefined {
+    getMessage (chatId: string, messageId: string): Message | undefined {
       return this.getChat(chatId)?.messages.find(m => m.id === messageId);
     },
 
-    shouldGenerateTitle(chat: Chat): boolean {
+    shouldGenerateTitle (chat: Chat): boolean {
       return !chat.title || chat.title === this.settings.defaultChatTitle;
     },
 
-    setIsSending(value: boolean) {
+    setIsSending (value: boolean) {
       this.isSending = value;
     },
 
-    async createChat() {
+    async createChat () {
       const newChat: Chat = {
         id: crypto.randomUUID(),
         title: this.settings.defaultChatTitle,
         messages: [],
-        timestamp: new Date().getTime()
+        timestamp: new Date().getTime(),
       };
 
       this.chats.unshift(newChat);
@@ -84,7 +84,7 @@ export const useChatStore = defineStore('chat', {
       return newChat;
     },
 
-    async deleteChat(chatId: string) {
+    async deleteChat (chatId: string) {
       const index = this.chats.findIndex(chat => chat.id === chatId);
       if (index !== -1) {
         this.chats.splice(index, 1);
@@ -96,7 +96,7 @@ export const useChatStore = defineStore('chat', {
       }
     },
 
-    async clearChats() {
+    async clearChats () {
       try {
         this.chats = [];
         this.activeChatId = '';
@@ -108,7 +108,7 @@ export const useChatStore = defineStore('chat', {
       }
     },
 
-    async renameChat(chatId: string, newTitle: string) {
+    async renameChat (chatId: string, newTitle: string) {
       const chat = this.getChat(chatId);
       if (chat) {
         chat.title = newTitle;
@@ -116,7 +116,7 @@ export const useChatStore = defineStore('chat', {
       }
     },
 
-    async addMessage(chatId: string, message: Omit<Message, 'id'>, attachment?: { content: string, type: 'text' | 'image', meta: File }) {
+    async addMessage (chatId: string, message: Omit<Message, 'id'>, attachment?: { content: string, type: 'text' | 'image', meta: File }) {
       const chat = this.getChat(chatId);
 
       if (chat) {
@@ -143,7 +143,7 @@ export const useChatStore = defineStore('chat', {
       return null;
     },
 
-    async updateMessage(chatId: string, messageId: string, content: string, isLoading?: boolean, thinkTime?: number, isThinking?: boolean) {
+    async updateMessage (chatId: string, messageId: string, content: string, isLoading?: boolean, thinkTime?: number, isThinking?: boolean) {
       const message = this.getMessage(chatId, messageId);
       if (message) {
         message.content = content;
@@ -165,7 +165,7 @@ export const useChatStore = defineStore('chat', {
       }
     },
 
-    async generateChatTitle(chatId: string) {
+    async generateChatTitle (chatId: string) {
       const chat = this.getChat(chatId);
       if (!chat || chat.messages.length < 1) return;
 
@@ -226,7 +226,7 @@ export const useChatStore = defineStore('chat', {
       }
     },
 
-    async sendMessage(chatId: string, content: string, attachmentContent: Attachment | null = null) {
+    async sendMessage (chatId: string, content: string, attachmentContent: Attachment | null = null) {
       try {
         const chat = this.activeChat;
         if (!chat) throw new Error('No active chat');
@@ -368,7 +368,7 @@ ${metaInfo}
             messages: chat.messages.map(msg => ({
               role: msg.role,
               content: msg.content,
-              ...(msg.attachmentContent && msg.attachmentMeta?.type === 'image' ? { images: [msg.attachmentContent] } : {})
+              ...(msg.attachmentContent && msg.attachmentMeta?.type === 'image' ? { images: [msg.attachmentContent] } : {}),
             })),
             stream: true,
           };
@@ -456,7 +456,7 @@ ${metaInfo}
       }
     },
 
-    async editMessage(
+    async editMessage (
       chatId: string,
       messageId: string,
       newContent: string,
@@ -478,7 +478,7 @@ ${metaInfo}
       }
     },
 
-    async deleteMessage(chatId: string, messageId: string) {
+    async deleteMessage (chatId: string, messageId: string) {
       const chat = this.getChat(chatId);
       if (!chat) return;
 
@@ -489,7 +489,7 @@ ${metaInfo}
       }
     },
 
-    async regenerateMessage(chatId: string, messageId: string) {
+    async regenerateMessage (chatId: string, messageId: string) {
       const chat = this.getChat(chatId);
       if (!chat) return;
 
@@ -505,11 +505,11 @@ ${metaInfo}
       await this.sendMessage(chatId, prevMessage.content, prevMessage.attachmentContent ? {
         content: prevMessage.attachmentContent,
         type: prevMessage.attachmentMeta?.type || 'text',
-        meta: prevMessage.attachmentMeta as File
+        meta: prevMessage.attachmentMeta as File,
       } : null);
     },
 
-    async saveSummary(chatId: string, messageId: string) {
+    async saveSummary (chatId: string, messageId: string) {
       const chat = this.getChat(chatId);
       if (!chat) return;
 
@@ -533,12 +533,12 @@ ${metaInfo}
               properties: {
                 facts: {
                   type: 'array',
-                  items: { type: 'string' }
-                }
+                  items: { type: 'string' },
+                },
               },
-              required: ['facts']
-            }
-          }
+              required: ['facts'],
+            },
+          },
         });
 
         const facts = JSON.parse(response?.message?.content)?.facts;
@@ -547,7 +547,7 @@ ${metaInfo}
           const now = Date.now();
 
           this.memory = (this.memory || []).filter(entry => now - entry.timestamp < 1200000);
-          this.memory.push({ text: summary, timestamp: now });
+          this.memory.push({ content: summary, timestamp: now });
 
           while (this.memory.length > 10) {
             this.memory.shift();
@@ -564,7 +564,7 @@ ${metaInfo}
       }
     },
 
-    async fetchModels() {
+    async fetchModels () {
       try {
         const response = await this.http.request<OllamaTagsResponse>({
           method: 'GET',

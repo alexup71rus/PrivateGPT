@@ -1,6 +1,6 @@
-import type {Chat, MemoryEntry} from "@/types/chats.ts";
+import type { Chat, MemoryEntry } from '@/types/chats.ts';
 
-export async function openDB(): Promise<IDBDatabase> {
+export async function openDB (): Promise<IDBDatabase> {
   return new Promise<IDBDatabase>((resolve, reject) => {
     const request: IDBOpenDBRequest = indexedDB.open('PrivateGPT', 1);
     request.onupgradeneeded = (event: IDBVersionChangeEvent) => {
@@ -13,7 +13,7 @@ export async function openDB(): Promise<IDBDatabase> {
   });
 }
 
-export async function loadChats(): Promise<Chat[]> {
+export async function loadChats (): Promise<Chat[]> {
   try {
     const db: IDBDatabase = await openDB();
     const transaction: IDBTransaction = db.transaction(['chats'], 'readonly');
@@ -40,7 +40,7 @@ export async function loadChats(): Promise<Chat[]> {
   }
 }
 
-export async function saveChats(chats: Chat[]): Promise<void> {
+export async function saveChats (chats: Chat[]): Promise<void> {
   try {
     const db: IDBDatabase = await openDB();
     const transaction: IDBTransaction = db.transaction(['chats'], 'readwrite');
@@ -54,11 +54,11 @@ export async function saveChats(chats: Chat[]): Promise<void> {
           ...message,
           attachmentMeta: message.attachmentMeta
             ? {
-                type: message.attachmentMeta.type,
-                name: message.attachmentMeta.name,
-                size: message.attachmentMeta.size,
-                lastModified: message.attachmentMeta.lastModified,
-              }
+              type: message.attachmentMeta.type,
+              name: message.attachmentMeta.name,
+              size: message.attachmentMeta.size,
+              lastModified: message.attachmentMeta.lastModified,
+            }
             : undefined,
         })),
       };
@@ -80,7 +80,7 @@ export async function saveChats(chats: Chat[]): Promise<void> {
   }
 }
 
-export async function saveChat(chat: Chat): Promise<void> {
+export async function saveChat (chat: Chat): Promise<void> {
   try {
     const db: IDBDatabase = await openDB();
     const transaction: IDBTransaction = db.transaction(['chats'], 'readwrite');
@@ -110,7 +110,7 @@ export async function saveChat(chat: Chat): Promise<void> {
   }
 }
 
-export async function deleteChat(chatId: string): Promise<void> {
+export async function deleteChat (chatId: string): Promise<void> {
   try {
     const db: IDBDatabase = await openDB();
     const transaction: IDBTransaction = db.transaction(['chats'], 'readwrite');
@@ -126,7 +126,7 @@ export async function deleteChat(chatId: string): Promise<void> {
   }
 }
 
-export async function clearAllChats(): Promise<void> {
+export async function clearAllChats (): Promise<void> {
   try {
     const db: IDBDatabase = await openDB();
     const transaction: IDBTransaction = db.transaction(['chats'], 'readwrite');
@@ -142,7 +142,7 @@ export async function clearAllChats(): Promise<void> {
   }
 }
 
-export async function loadMemory(): Promise<MemoryEntry[]> {
+export async function loadMemory (): Promise<MemoryEntry[]> {
   try {
     const db: IDBDatabase = await openDB();
     const transaction: IDBTransaction = db.transaction(['memory'], 'readonly');
@@ -165,7 +165,7 @@ export async function loadMemory(): Promise<MemoryEntry[]> {
   }
 }
 
-export async function saveMemory(memory: MemoryEntry[]): Promise<void> {
+export async function saveMemory (memory: MemoryEntry[]): Promise<void> {
   try {
     const db: IDBDatabase = await openDB();
     const transaction: IDBTransaction = db.transaction(['memory'], 'readwrite');

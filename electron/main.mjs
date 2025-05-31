@@ -6,92 +6,150 @@ import { spawn } from 'node:child_process';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-let mainWindow;
-let backendProcess;
-let tryesIfFailLoad = 10;
-const backendPort = 3001;
-
-function startBackend() {
-  const backendEntry = path.join(__dirname, '../backend/dist/main.js');
-  console.log('Spawning backend:', backendEntry);
-
-  backendProcess = spawn('node', [backendEntry], {
-    stdio: 'inherit',
+const config = {
+  backend: {
+    entry: path.join(__dirname, '../backend/dist/main.js'),
+    port: 3001,
     env: {
-      ...process.env,
-      PORT: String(backendPort),
+      PORT: '3001',
       CORS_ORIGIN: 'http://localhost:3000',
     },
+  },
+  window: {
+    width: 1200,
+    height: 800,
+    devHeight: 1200,
+  },
+  reloadAttempts: 10,
+};
+
+let mainWindow = null;
+let backendProcess = null;
+
+function startBackend() {
+  if (backendProcess) {
+    console.warn('Backend process already running!');
+    return;
+  }
+
+  console.log('Starting backend:', config.backend.entry);
+
+  backendProcess = spawn('node', [config.backend.entry], {
+    stdio: 'inherit',
+    env: { ...process.env, ...config.backend.env },
   });
 
   backendProcess.on('error', (err) => {
-    console.error('Failed to start backend:', err);
+    console.error('❌ Backend failed to start:', err);
+    backendProcess = null;
   });
 
   backendProcess.on('exit', (code) => {
-    console.log('Backend exited with code:', code);
+    console.log(`🔴 Backend exited with code ${code}`);
+    backendProcess = null;
   });
 }
 
+function setupIpcHandlers() {
+  ipcMain.removeHandler('window:minimize');
+  ipcMain.removeHandler('window:maximize');
+  ipcMain.removeHandler('window:close');
+  ipcMain.removeHandler('backend-port');
+
+  ipcMain.handle('window:minimize', () => mainWindow?.minimize());
+  ipcMain.handle('window:maximize', () => {
+    if (mainWindow?.isMaximized()) mainWindow.unmaximize();
+    else mainWindow?.maximize();
+  });
+  ipcMain.handle('window:close', () => mainWindow?.close());
+  ipcMain.handle('backend-port', () => config.backend.port);
+}
+
 function createWindow() {
+  if (mainWindow) {
+    console.warn('Main window already exists! Focusing it instead.');
+    mainWindow.focus();
+    return;
+  }
+
   const isDev = process.argv.includes('--dev') || process.env.NODE_ENV === 'development';
+  const windowHeight = isDev ? config.window.devHeight : config.window.height;
 
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: isDev ? 1200 : 800,
+    width: config.window.width,
+    height: windowHeight,
     frame: false,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: true, // Дополнительная безопасность
       preload: path.join(__dirname, 'preload.js'),
     },
   });
 
-  console.log('Is Development:', isDev);
-
   if (isDev) {
+    console.log('🚀 Running in development mode');
     mainWindow.loadURL('http://localhost:3000');
     mainWindow.webContents.openDevTools();
   } else {
+    console.log('🏁 Running in production mode');
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 
-  ipcMain.handle('window:minimize', () => mainWindow.minimize());
-  ipcMain.handle('window:maximize', () => {
-    if (mainWindow.isMaximized()) mainWindow.unmaximize();
-    else mainWindow.maximize();
-  });
-  ipcMain.handle('window:close', () => mainWindow.close());
-  ipcMain.handle('backend-port', () => {
-    return backendPort;
-  });
+  setupIpcHandlers();
+
+  let reloadAttempts = config.reloadAttempts;
 
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
 
   mainWindow.webContents.on('did-fail-load', () => {
-    if (tryesIfFailLoad <= 0) return;
-    tryesIfFailLoad--;
+    if (reloadAttempts <= 0) {
+      console.error('Failed to load after multiple attempts');
+      return;
+    }
+    reloadAttempts--;
     setTimeout(() => mainWindow.reload(), 500);
   });
 
   mainWindow.webContents.on('did-finish-load', () => {
-    tryesIfFailLoad = 10;
-    mainWindow.webContents.send('backend-port', backendPort);
+    reloadAttempts = config.reloadAttempts;
+    mainWindow.webContents.send('backend-port', config.backend.port);
   });
 }
 
-app.whenReady().then(() => {
-  createWindow();
-  startBackend();
+function cleanup() {
+  if (backendProcess) {
+    console.log('Terminating backend process...');
+    backendProcess.kill();
+    backendProcess = null;
+  }
+}
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+app.whenReady()
+  .then(() => {
+    console.log('App is ready!');
+    createWindow();
+    startBackend();
+
+    // macOS hint
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
+      }
+    });
+  })
+  .catch((err) => {
+    console.error('Failed to start app:', err);
+    cleanup();
+    app.quit();
   });
-});
 
 app.on('window-all-closed', () => {
-  if (backendProcess) backendProcess.kill();
-  if (process.platform !== 'darwin') app.quit();
+  // macOS hint
+  if (process.platform !== 'darwin') {
+    cleanup();
+    app.quit();
+  }
 });

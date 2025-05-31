@@ -1,4 +1,4 @@
-export type MemoryEntry = { id?: number; text: string; timestamp: number };
+export type MemoryEntry = { id?: number; content: string; timestamp: number };
 
 export interface ChatModel {
   name: string;

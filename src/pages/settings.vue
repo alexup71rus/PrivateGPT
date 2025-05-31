@@ -1,20 +1,35 @@
 <template>
   <div>
-    <h1>{{ graphqlStore.helloMessage || 'Loading...' }}</h1>
-    <v-btn @click="graphqlStore.fetchHello">Fetch Hello</v-btn>
+    <v-btn @click="handleSaveChat">Save Chat</v-btn>
+    <v-btn @click="graphqlStore.fetchChats">Fetch Chats</v-btn>
     <div v-if="graphqlStore.loading">Loading...</div>
     <div v-if="graphqlStore.error">Error: {{ graphqlStore.error }}</div>
+    <pre>
+      {{ graphqlStore.chats }}
+    </pre>
   </div>
 </template>
 
-<script>
-import { defineComponent } from 'vue';
-import { useGraphQLStore } from '@/stores/graphql';
+<script lang="ts" setup>
+  import { useGraphQLStore } from '@/stores/graphql';
+  import type { Chat } from '@/types/chats.ts';
 
-export default defineComponent({
-  setup() {
-    const graphqlStore = useGraphQLStore();
-    return { graphqlStore };
-  },
-});
+  const graphqlStore = useGraphQLStore();
+
+  const handleSaveChat = () => {
+    const newChat: Chat = {
+      id: crypto.randomUUID(),
+      title: 'Новый чат',
+      timestamp: Date.now(),
+      messages: [
+        {
+          id: crypto.randomUUID(),
+          role: 'user',
+          content: 'Привет',
+          timestamp: Date.now(),
+        },
+      ],
+    };
+    graphqlStore.saveChat(newChat);
+  };
 </script>

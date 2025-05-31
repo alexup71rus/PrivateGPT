@@ -39,7 +39,6 @@ watch(
   }
 );
 
-// Методы для управления окном через IPC
 const minimizeWindow = () => {
   (window as any).electronAPI.minimizeWindow();
 };
@@ -55,7 +54,7 @@ const closeWindow = () => {
 
 <template>
   <v-app>
-    <v-app-bar v-if="isElectron" app flat dark>
+    <v-app-bar v-if="isElectron" app flat dark density="compact">
       <v-toolbar-title>PrivateGPT</v-toolbar-title>
       <v-spacer></v-spacer>
       <v-btn icon size="small" @click="minimizeWindow">
@@ -111,5 +110,9 @@ const closeWindow = () => {
 
 .v-btn {
   -webkit-app-region: no-drag;
+}
+
+.v-toolbar-title {
+  font-size: 16px;
 }
 </style>
