@@ -16,21 +16,34 @@
   const isElectron = !!(window as any).electronAPI;
 
   onMounted(async () => {
-    await chat.fetchModels();
-    await chat.initialize();
+    await Promise.all([chat.fetchModels(), chat.initialize()]);
 
-    if (chat.error && !chat.chats?.length) {
+    if (chat.error || !chat.chats?.length || window.location.pathname !== '/') {
       return;
     }
 
-    const hash = window.location.hash.replace('#', '');
-    if (chat.chats.length === 0) {
+    const chatIdFromHash = window.location.hash.replace('#', '');
+    const chats = chat.chats;
+
+    if (!chats.length) {
       const newChatId = (await chat.createChat())?.id;
       if (newChatId) await selectChat(newChatId);
-    } else if (!hash) {
-      await selectChat(chat.chats[0].id);
+      return;
+    }
+
+    if (!chatIdFromHash) {
+      await selectChat(chats[0].id);
+      return;
+    }
+
+    const selectedChat = chats.find(chat => chat.id === chatIdFromHash);
+    if (selectedChat) {
+      await selectChat(chatIdFromHash);
+    } else if (chats[chats.length - 1].messages.length === 0) {
+      await selectChat(chats[chats.length - 1].id);
     } else {
-      await selectChat(hash);
+      const newChatId = (await chat.createChat())?.id;
+      if (newChatId) await selectChat(newChatId);
     }
   });
 
@@ -57,7 +70,7 @@
 </script>
 
 <template>
-  <v-app>
+  <v-app :class="{ electron: isElectron }">
     <v-app-bar
       v-if="isElectron"
       app

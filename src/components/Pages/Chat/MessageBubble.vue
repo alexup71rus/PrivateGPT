@@ -26,7 +26,7 @@
 
   const copyCodeBlock = async (code: string) => {
     await navigator.clipboard.writeText(code);
-    showSnackbar({ message: 'Код скопирован!', type: 'success' });
+    showSnackbar({ message: 'Code copied!', type: 'success' });
   };
 
   const openEditDialog = () => {
@@ -36,12 +36,12 @@
 
   const saveEditedMessage = async (makeResend = false) => {
     if (!editedContent.value.trim()) {
-      showSnackbar({ message: 'Текст не может быть пустым', type: 'warning' });
+      showSnackbar({ message: 'Text cannot be empty', type: 'warning' });
       return;
     }
 
     await chat.editMessage(chat.activeChatId, props.message.id, editedContent.value);
-    showSnackbar({ message: 'Сообщение обновлено', type: 'success' });
+    showSnackbar({ message: 'Message updated', type: 'success' });
 
     if (!makeResend) {
       isEditDialogOpen.value = false;
@@ -132,11 +132,11 @@
       try {
         const result = await chat.saveSummary(chatId, props.message.id);
         showSnackbar({
-          message: result ? 'Память обновлена: ' + result : 'Нечего сохранять',
+          message: result ? 'Memory updated: ' + result : 'Nothing to save',
           type: result ? 'success' : 'warning',
         });
       } catch (error) {
-        showSnackbar({ message: 'Ошибка при сохранении саммари', type: 'error' });
+        showSnackbar({ message: 'Error saving summary', type: 'error' });
       }
     }
   };
@@ -183,23 +183,23 @@
 
   <v-dialog v-model="isEditDialogOpen" max-width="800px">
     <v-card>
-      <v-card-title>Редактировать сообщение</v-card-title>
+      <v-card-title>Edit Message</v-card-title>
       <v-card-text>
         <v-textarea
           v-model="editedContent"
           auto-grow
           class="edit-textarea"
           hide-details
-          label="Текст сообщения"
+          label="Message Text"
           rows="5"
           variant="outlined"
         />
       </v-card-text>
       <v-card-actions>
         <v-spacer />
-        <v-btn v-if="message.role === 'user'" color="primary" text @click="saveEditedMessage(true)">Сохранить и отправить</v-btn>
-        <v-btn color="primary" text @click="saveEditedMessage()">Сохранить</v-btn>
-        <v-btn text @click="closeEditDialog">Закрыть</v-btn>
+        <v-btn v-if="message.role === 'user'" color="primary" text @click="saveEditedMessage(true)">Save and Resend</v-btn>
+        <v-btn color="primary" text @click="saveEditedMessage()">Save</v-btn>
+        <v-btn text @click="closeEditDialog">Close</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>

@@ -12,7 +12,7 @@ export const formatThinkTime = (milliseconds: number): string => {
   return `${(milliseconds / 1000).toFixed(1)} сек`;
 };
 
-export const copyToClipboard = async (text: string, message = 'Скопировано!') => {
+export const copyToClipboard = async (text: string, message = 'Copied!') => {
   const { showSnackbar } = useAlert();
   await navigator.clipboard.writeText(text);
   showSnackbar({ message, type: 'success' });
@@ -27,8 +27,8 @@ export const formatDate = (timestamp: number) => {
   const isToday = date.toDateString() === today.toDateString();
   const isYesterday = date.toDateString() === yesterday.toDateString();
 
-  if (isToday) return 'Сегодня';
-  if (isYesterday) return 'Вчера';
+  if (isToday) return 'Today';
+  if (isYesterday) return 'Tomorrow';
 
   return date.toLocaleDateString('ru-RU', {
     day: 'numeric',

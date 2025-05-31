@@ -1,7 +1,7 @@
 <script lang="ts" setup>
   import { useChatStore } from '@/stores/chat.ts';
   import { computed, onMounted, ref } from 'vue';
-  import { useRouter } from 'vue-router';
+  import { useRoute, useRouter } from 'vue-router';
   import { useChatActions } from '@/composables/useChatActions.ts';
   import { useAppStore } from '@/stores/app.ts';
   import { useAlert } from '@/plugins/alertPlugin.ts';
@@ -13,6 +13,7 @@
     isChatPage: boolean;
   }>();
 
+  const route = useRoute();
   const router = useRouter();
   const app = useAppStore();
   const chat = useChatStore();
@@ -43,6 +44,14 @@
     }));
   });
 
+  const menuItems = [
+    { title: 'General', path: '/settings', icon: 'mdi-cog' },
+    { title: 'Search', path: '/settings/search', icon: 'mdi-magnify' },
+    { title: 'Memory', path: '/settings/memory', icon: 'mdi-memory' },
+    { title: 'RAG', path: '/settings/rag', icon: 'mdi-database' },
+  ];
+  const isActive = (path: string) => route.path === path;
+
   const handleChatClick = (id: string) => {
     selectChat(id);
   };
@@ -55,6 +64,8 @@
 
       if (activeChat) {
         router.push(`/#${activeChat.id}`);
+      } else if (chat.chats[chat.chats.length - 1].messages.length === 0) {
+        selectChat(chat.chats[chat.chats.length - 1].id);
       } else {
         onNewChat();
       }
@@ -109,50 +120,67 @@
     </div>
 
     <transition name="fade">
-      <div v-if="app.isAsideOpen && isChatPage" class="chats-container">
-        <v-text-field
-          v-model="searchQuery"
-          class="chats-search-input"
-          clearable
-          hide-details="auto"
-          label="Поиск"
-          variant="solo-inverted"
-        >
-          <template #append-inner>
-            <v-btn
-              v-tooltip="'Удалить все чаты'"
-              color="red"
-              icon="mdi-trash-can"
-              variant="plain"
-              @click="removeAllChats"
-            />
-          </template>
-        </v-text-field>
+      <div v-if="app.isAsideOpen" class="chats-container">
+        <template v-if="isChatPage">
+          <v-text-field
+            v-model="searchQuery"
+            class="chats-search-input"
+            clearable
+            hide-details="auto"
+            label="Search"
+            variant="solo-inverted"
+          >
+            <template #append-inner>
+              <v-btn
+                v-tooltip="'Remove all chats'"
+                color="red"
+                icon="mdi-trash-can"
+                variant="plain"
+                @click="removeAllChats"
+              />
+            </template>
+          </v-text-field>
 
-        <div class="chat-list">
-          <template v-if="chat.chats?.length > 0">
-            <div v-for="group in groupedChats" :key="group.date.toString()" class="chat-group">
-              <div class="date-divider">{{ formatDate(group.date.getTime()) }}</div>
-              <div
-                v-for="_chat in group.chats"
-                :key="_chat.id"
-                :class="['chat-item', { 'chat-item--selected': chat.activeChatId === _chat.id }]"
-                @click="handleChatClick(_chat.id)"
-              >
-                <span>{{ _chat.title }}</span>
-                <v-btn
-                  class="delete-btn"
-                  :color="isPending(_chat.id) ? 'red' : ''"
-                  icon="mdi-delete"
-                  size="small"
-                  @click.stop="isPending(_chat.id) ? handleSecondClick(_chat.id) : handleFirstClick(_chat.id)"
-                  @mouseleave="resetDeletePending"
-                />
+          <div class="chats-list">
+            <template v-if="chat.chats?.length > 0">
+              <div v-for="group in groupedChats" :key="group.date.toString()" class="chat-group">
+                <div class="date-divider">{{ formatDate(group.date.getTime()) }}</div>
+                <div
+                  v-for="_chat in group.chats"
+                  :key="_chat.id"
+                  :class="['chat-item', { 'chat-item--selected': chat.activeChatId === _chat.id }]"
+                  @click="handleChatClick(_chat.id)"
+                >
+                  <span>{{ _chat.title }}</span>
+                  <v-btn
+                    class="delete-btn"
+                    :color="isPending(_chat.id) ? 'red' : ''"
+                    icon="mdi-delete"
+                    size="small"
+                    @click.stop="isPending(_chat.id) ? handleSecondClick(_chat.id) : handleFirstClick(_chat.id)"
+                    @mouseleave="resetDeletePending"
+                  />
+                </div>
               </div>
-            </div>
-          </template>
-          <v-skeleton-loader v-else :elevation="3" type="paragraph@3" />
-        </div>
+            </template>
+            <v-skeleton-loader v-else :elevation="3" type="paragraph@3" />
+          </div>
+        </template>
+        <template v-else>
+          <div class="settings-list">
+            <v-list density="compact">
+              <v-list-item
+                v-for="item in menuItems"
+                :key="item.path"
+                :active="isActive(item.path)"
+                :prepend-icon="item.icon"
+                :title="item.title"
+                :value="item.path"
+                @click="router.push(item.path)"
+              />
+            </v-list>
+          </div>
+        </template>
       </div>
     </transition>
 
@@ -271,7 +299,7 @@
   flex: 0;
 }
 
-.chat-list {
+.chats-list {
   display: flex;
   flex-direction: column;
   gap: 10px;

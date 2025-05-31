@@ -178,7 +178,7 @@
         density="comfortable"
         :disabled="chat.isSending || chat.models?.length === 0"
         hide-details
-        placeholder="Введите сообщение..."
+        placeholder="Enter message..."
         rows="1"
         variant="solo-filled"
         @keydown.enter.exact.prevent.stop
@@ -197,7 +197,7 @@
             prepend-icon="mdi-robot"
             variant="tonal"
           >
-            {{ selectedModel || 'Модель' }}
+            {{ selectedModel || 'Model' }}
           </v-btn>
         </template>
 
@@ -216,7 +216,7 @@
                     {{ model }}
                     <v-btn
                       v-if="isChangedModel && selectedModel === model"
-                      v-tooltip:top="'Установить по умолчанию'"
+                      v-tooltip:top="'Set as default'"
                       color="primary"
                       density="compact"
                       icon="mdi-check-circle"
@@ -235,7 +235,7 @@
               clearable
               dense
               hide-details
-              placeholder="Фильтр моделей"
+              placeholder="Filter models"
               variant="solo-filled"
             />
           </v-card-text>
@@ -261,7 +261,7 @@
           <v-icon>mdi-paperclip</v-icon>
         </template>
         <span v-if="attachment" v-tooltip:top="attachment.name">{{ attachment.name }}</span>
-        <span v-else>Прикрепить</span>
+        <span v-else>Attach</span>
         <v-btn
           v-if="attachment"
           icon="mdi-close"
@@ -278,7 +278,7 @@
         variant="tonal"
         @click="isSearch = !isSearch"
       >
-        Поиск
+        Search
       </v-btn>
       <v-btn
         class="send-btn"

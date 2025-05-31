@@ -82,6 +82,10 @@
 </template>
 
 <style lang="scss" scoped>
+::v-global(.electron .chat-page) {
+  height: calc(100vh - 48px) !important;
+}
+
 .chat-page {
   position: relative;
   display: flex;

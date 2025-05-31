@@ -8,14 +8,19 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    _Search: typeof import('./components/Pages/Settings/_Search.vue')['default']
     AlertProvider: typeof import('./components/Providers/AlertProvider.vue')['default']
     AttachmentChip: typeof import('./components/Pages/Chat/AttachmentChip.vue')['default']
     AttachmentPreview: typeof import('./components/Dialogs/AttachmentPreview.vue')['default']
     General: typeof import('./components/Pages/Settings/General.vue')['default']
+    ManageModels: typeof import('./components/Pages/Settings/ManageModels.vue')['default']
+    Memory: typeof import('./components/Pages/Settings/Memory.vue')['default']
     MessageBox: typeof import('./components/Pages/Chat/MessageBox.vue')['default']
     MessageBubble: typeof import('./components/Pages/Chat/MessageBubble.vue')['default']
+    Rag: typeof import('./components/Pages/Settings/Rag.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    Search: typeof import('./components/Pages/Settings/Search.vue')['default']
     SidebarLayout: typeof import('./components/Outline/SidebarLayout.vue')['default']
     ThinkPreview: typeof import('./components/Pages/Chat/ThinkPreview.vue')['default']
   }
