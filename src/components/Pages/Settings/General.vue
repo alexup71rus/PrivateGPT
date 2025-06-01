@@ -123,10 +123,14 @@
         type="submit"
         variant="flat"
         @click="saveSettings"
-      >Save</v-btn>
+      >Save Settings</v-btn>
     </v-col>
     <v-col>
-      <v-btn block variant="flat" @click="resetSettings">Reset</v-btn>
+      <v-btn
+        block
+        variant="outlined"
+        @click="resetSettings"
+      >Reset Settings</v-btn>
     </v-col>
   </v-card-actions>
 </template>

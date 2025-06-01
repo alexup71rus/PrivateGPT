@@ -34,7 +34,7 @@ export const useMemoryStore = defineStore('memory', {
         await waitForBackend();
         this.memory = await loadMemory();
       } catch (err: any) {
-        this.error = err.message;
+        this.error = err.message || 'Failed to fetch memory';
       } finally {
         this.loading = false;
       }
@@ -42,13 +42,41 @@ export const useMemoryStore = defineStore('memory', {
     async addMemory (content: string) {
       try {
         this.loading = true;
-        this.memory = [...(this.memory || []), { content, timestamp: Date.now() }];
+        const newEntry: MemoryEntry = { content, timestamp: Date.now() };
+        this.memory = [...(this.memory || []), newEntry];
         await saveMemory(this.memory);
-
       } catch (error) {
-        console.error(`Error saving summary:`, error);
-        this.error = error instanceof Error ? error.message : 'Failed to save summary';
-        return null;
+        console.error(`Error saving memory:`, error);
+        this.error = error instanceof Error ? error.message : 'Failed to save memory';
+        throw error;
+      } finally {
+        this.loading = false;
+      }
+    },
+    async updateMemory (timestamp: number, content: string) {
+      try {
+        this.loading = true;
+        this.memory = this.memory.map(entry =>
+          entry.timestamp === timestamp ? { ...entry, content } : entry
+        );
+        await saveMemory(this.memory);
+      } catch (error) {
+        console.error(`Error updating memory:`, error);
+        this.error = error instanceof Error ? error.message : 'Failed to update memory';
+        throw error;
+      } finally {
+        this.loading = false;
+      }
+    },
+    async deleteMemory (timestamp: number) {
+      try {
+        this.loading = true;
+        this.memory = this.memory.filter(entry => entry.timestamp !== timestamp);
+        await saveMemory(this.memory);
+      } catch (error) {
+        console.error(`Error deleting memory:`, error);
+        this.error = error instanceof Error ? error.message : 'Failed to delete memory';
+        throw error;
       } finally {
         this.loading = false;
       }
@@ -94,14 +122,7 @@ export const useMemoryStore = defineStore('memory', {
         }
 
         const summary = facts.join('. ') + '.';
-        const newEntry: MemoryEntry = {
-          content: summary,
-          timestamp: Date.now(),
-        };
-
-        this.memory = [...(this.memory || []), newEntry];
-        await saveMemory(this.memory);
-
+        await this.addMemory(summary);
         return summary;
       } catch (error) {
         console.error(`Error saving summary for chat:`, error);
