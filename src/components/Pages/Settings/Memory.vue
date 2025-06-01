@@ -3,26 +3,21 @@
   import { useSettingsStore } from '@/stores/settings';
   import { useChatStore } from '@/stores/chat';
   import { useAlert } from '@/plugins/alertPlugin';
+  import type { ISettings } from '@/types/settings.ts';
 
   const settingsStore = useSettingsStore();
   const chatStore = useChatStore();
   const { showSnackbar } = useAlert();
 
-  interface FormSettings {
-    memoryModel: string;
-    memoryPrompt: string;
-  }
-
-  const formSettings = ref<FormSettings>({
+  const formSettings = ref<Partial<ISettings>>({
     memoryModel: settingsStore.settings.memoryModel || '',
     memoryPrompt: settingsStore.settings.memoryPrompt,
   });
 
-  const availableModels = computed(() => chatStore.models || []);
-
-  const isFormValid = computed(() => {
-    return !!formSettings.value.memoryModel;
-  });
+  const availableModels = computed(() => [
+    { name: 'General model', id: '' },
+    ...(chatStore.models || []),
+  ]);
 
   const saveSettings = () => {
     settingsStore.updateSettings(formSettings.value);
@@ -52,7 +47,6 @@
         item-value="id"
         :items="availableModels"
         label="Model for memory"
-        :rules="[v => !!v || 'Model is required']"
         variant="solo-filled"
       />
       <v-textarea
@@ -68,10 +62,10 @@
     <v-col>
       <v-btn
         block
-        color="primary"
-        :disabled="!isFormValid"
+        color="blue"
         type="submit"
         variant="flat"
+        @click="saveSettings"
       >Save</v-btn>
     </v-col>
     <v-col>

@@ -27,6 +27,8 @@ export const useChatStore = defineStore('chat', {
     return {
       http,
       settings: settings as ISettings,
+      connectionStatus: 'disconnected' as 'connected' | 'disconnected' | 'checking',
+      lastConnectionCheck: 0,
       models: [] as OllamaModel[],
       chats: [] as Chat[],
       memory: [] as MemoryEntry[],
@@ -48,6 +50,15 @@ export const useChatStore = defineStore('chat', {
     },
   },
   actions: {
+    async checkOllamaConnection () {
+      this.error = null;
+      await this.fetchModels();
+      this.connectionStatus = this.error === 'Network Error' ? 'disconnected' : 'connected';
+      this.lastConnectionCheck = Date.now();
+      this.models = this.connectionStatus === 'connected' ? this.models : [];
+      return this.connectionStatus === 'connected';
+    },
+
     async initialize () {
       await Promise.all([this.fetchChats(), this.fetchMemory()]);
     },
@@ -252,7 +263,7 @@ export const useChatStore = defineStore('chat', {
         const response = await this.http.request({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          url: `${this.settings.ollamaLink}/api/chat`,
+          url: `${this.settings.ollamaURL}/api/chat`,
           data: {
             model: this.settings.systemModel,
             messages: [
@@ -378,7 +389,7 @@ export const useChatStore = defineStore('chat', {
             stream: true,
           };
 
-          const response = await fetch(`${this.settings.ollamaLink}/api/generate`, {
+          const response = await fetch(`${this.settings.ollamaURL}/api/generate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),
@@ -421,6 +432,7 @@ export const useChatStore = defineStore('chat', {
                     isLoading: true,
                     thinkTime: thinkStartTime && isInThinkBlock ? Date.now() - thinkStartTime : undefined,
                     isThinking: isInThinkBlock,
+                    timestamp: Date.now(),
                   });
                   assistantContent += chunkContent;
                   await this.updateMessage(chatId, assistantMessageId!, assistantContent, true, thinkStartTime && isInThinkBlock ? Date.now() - thinkStartTime : undefined, isInThinkBlock);
@@ -464,7 +476,7 @@ export const useChatStore = defineStore('chat', {
             stream: true,
           };
 
-          const response = await fetch(`${this.settings.ollamaLink}/api/chat`, {
+          const response = await fetch(`${this.settings.ollamaURL}/api/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),
@@ -613,7 +625,7 @@ export const useChatStore = defineStore('chat', {
         const response = await this.http.request({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          url: `${this.settings.ollamaLink}/api/chat`,
+          url: `${this.settings.ollamaURL}/api/chat`,
           data: {
             model: this.settings.systemModel,
             messages: [
@@ -668,7 +680,7 @@ export const useChatStore = defineStore('chat', {
       try {
         const response = await this.http.request<OllamaTagsResponse>({
           method: 'GET',
-          url: `${this.settings.ollamaLink}/api/tags`,
+          url: `${this.settings.ollamaURL}/api/tags`,
         });
         this.models = response.models || [];
         return this.models;

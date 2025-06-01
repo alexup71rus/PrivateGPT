@@ -1,20 +1,19 @@
-export type Theme = 'light' | 'dark';
+export type Theme = 'light' | 'dark' | 'system';
 
 export const DEFAULT_SETTINGS = {
   isAsideOpen: false as boolean,
-  ////
-  ollamaLink: 'http://localhost:11434' as string,
+  /* --- */
+  ollamaURL: 'http://localhost:11434' as string,
   selectedModel: '' as string,
   defaultModel: '' as string,
   memoryModel: '' as string,
   searchModel: '' as string,
-  searxngUrl: '' as string,
+  searxngURL: '' as string,
   defaultChatTitle: 'New chat' as string,
   theme: 'dark' as Theme,
   isSearchAsDefault: false as boolean,
   chatScrollMode: 'scroll' as 'gap' | 'scroll',
   systemPrompt: '',
-  presetsPrompts: [],
   systemModel: 'llama3.2:latest',
   titlePrompt: 'You are an assistant that generates a concise chat title based on a user message and assistant response. Return a JSON object with a "title" field containing a short, descriptive title (max 50 characters) summarizing the conversation topic.' as string,
   memoryPrompt: `You are an AI assistant tasked with summarizing key factual information about the user from a short conversation for long-term memory storage. The conversation includes messages where "user" is the human and "assistant" is the AI. Your goal is to extract concise, self-contained facts about the user, focusing on their preferences, background, or notable details explicitly mentioned.
@@ -36,12 +35,6 @@ export const DEFAULT_SETTINGS = {
     "User prefers using Vue.js for frontend development."
   ]
 }` as string,
-  /*
-  If there are no strong facts, infer plausible general facts based on the conversation style, preferences, or topics.
-  Never return an empty array. Always provide at least one reasonable fact.
-  ---
-  If there is no factual information, return an empty array.
-  */
 } as const;
 
 export type ISettings = typeof DEFAULT_SETTINGS;

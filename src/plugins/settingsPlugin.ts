@@ -1,14 +1,14 @@
 import '@mdi/font/css/materialdesignicons.css';
 import 'vuetify/styles';
 import { createVuetify } from 'vuetify';
-import {useSettingsStore} from "@/stores/settings.ts";
+import { useSettingsStore } from '@/stores/settings.ts';
 
-export default function createSettingsPlugin() {
+export default function createSettingsPlugin () {
   const settingsStore = useSettingsStore();
 
-  return createVuetify({
+  const vuetify = createVuetify({
     theme: {
-      defaultTheme: settingsStore.isDarkTheme.value ? 'dark' : 'light',
+      defaultTheme: settingsStore.isDarkTheme ? 'dark' : 'light',
       themes: {
         light: {
           colors: {
@@ -33,4 +33,10 @@ export default function createSettingsPlugin() {
       },
     },
   });
+
+  settingsStore.$subscribe(() => {
+    vuetify.theme.global.name.value = settingsStore.isDarkTheme ? 'dark' : 'light';
+  });
+
+  return vuetify;
 }

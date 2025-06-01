@@ -10,12 +10,27 @@ export const useSettingsStore = defineStore('settings', {
 
     return {
       settings,
+      systemThemeDark: window.matchMedia('(prefers-color-scheme: dark)').matches,
     };
   },
   getters: {
-    isDarkTheme: state => computed(() => state.settings.theme === 'dark'),
+    isDarkTheme: state => {
+      if (state.settings.theme === 'system') {
+        return state.systemThemeDark;
+      }
+      return state.settings.theme === 'dark';
+    },
   },
   actions: {
+    initThemeListener () {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const handler = (e: MediaQueryListEvent) => {
+        this.systemThemeDark = e.matches;
+      };
+      mediaQuery.addEventListener('change', handler);
+
+      return () => mediaQuery.removeEventListener('change', handler);
+    },
     updateSettings (updates: Partial<ISettings>) {
       Object.assign(this.settings, updates);
       try {

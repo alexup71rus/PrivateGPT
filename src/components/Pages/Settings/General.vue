@@ -1,49 +1,49 @@
 <script lang="ts" setup>
-  import { computed, ref } from 'vue';
+  import { computed, ref, watch } from 'vue';
   import { useSettingsStore } from '@/stores/settings';
   import { useChatStore } from '@/stores/chat';
   import { useAlert } from '@/plugins/alertPlugin';
+  import type { ISettings } from '@/types/settings.ts';
 
   const settingsStore = useSettingsStore();
   const chatStore = useChatStore();
   const { showSnackbar } = useAlert();
 
-  interface FormSettings {
-    theme: 'light' | 'dark';
-    ollamaLink: string;
-    systemModel: string;
-    titlePrompt: string;
-    defaultChatTitle: string;
-  }
-
-  const formSettings = ref<FormSettings>({
+  const formSettings = ref<Partial<ISettings>>({
     theme: settingsStore.settings.theme,
-    ollamaLink: settingsStore.settings.ollamaLink,
+    ollamaURL: settingsStore.settings.ollamaURL,
     systemModel: settingsStore.settings.systemModel,
     titlePrompt: settingsStore.settings.titlePrompt,
     defaultChatTitle: settingsStore.settings.defaultChatTitle,
   });
 
   const availableModels = computed(() => chatStore.models || []);
+  const connectionStatus = computed(() => chatStore.connectionStatus);
 
   const isFormValid = computed(() => {
     return (
-      formSettings.value.ollamaLink.trim() !== '' &&
-      /^https?:\/\/[^\s/$.?#].[^\s]*$/.test(formSettings.value.ollamaLink) &&
-      formSettings.value.defaultChatTitle.trim() !== ''
+      formSettings.value.ollamaURL?.trim() !== '' &&
+      /^https?:\/\/[^\s/$.?#].[^\s]*$/.test(formSettings.value.ollamaURL || '') &&
+      formSettings.value.defaultChatTitle?.trim() !== ''
     );
   });
 
-  const saveSettings = () => {
-    console.log('saveSettings');
-    settingsStore.updateSettings(formSettings.value);
-    showSnackbar({ message: 'General settings saved', type: 'success' });
+  const saveSettings = async () => {
+    await settingsStore.updateSettings(formSettings.value);
+    const isConnected = await chatStore.checkOllamaConnection();
+
+    showSnackbar({
+      message: isConnected
+        ? 'Settings saved. Connection successful'
+        : 'Settings saved but connection failed',
+      type: isConnected ? 'success' : 'error',
+    });
   };
 
   const resetSettings = () => {
     formSettings.value = {
-      theme: 'dark',
-      ollamaLink: 'http://localhost:11434',
+      theme: 'system',
+      ollamaURL: 'http://localhost:11434',
       systemModel: 'llama3.2:latest',
       titlePrompt: settingsStore.settings.titlePrompt,
       defaultChatTitle: 'New chat',
@@ -51,6 +51,12 @@
     settingsStore.resetSettings();
     showSnackbar({ message: 'General settings reset', type: 'success' });
   };
+
+  watch(() => formSettings.value.ollamaURL, async newUrl => {
+    if (newUrl && /^https?:\/\/[^\s/$.?#].[^\s]*$/.test(newUrl)) {
+      await chatStore.checkOllamaConnection();
+    }
+  }, { immediate: true });
 </script>
 
 <template>
@@ -62,17 +68,25 @@
       <v-select
         v-model="formSettings.theme"
         class="mb-4"
-        :items="[{ title: 'Light', value: 'light' }, { title: 'Dark', value: 'dark' }]"
+        :items="[{ title: 'Light', value: 'light' }, { title: 'Dark', value: 'dark' }, { title: 'System', value: 'system' }]"
         label="Theme"
         variant="solo-filled"
       />
       <v-text-field
-        v-model="formSettings.ollamaLink"
+        v-model="formSettings.ollamaURL"
         class="mb-4"
         label="Ollama URL"
         :rules="[v => !!v || 'URL is required', v => /^https?:\/\/[^\s/$.?#].[^\s]*$/.test(v) || 'Invalid URL format']"
         variant="solo-filled"
-      />
+      >
+        <template #append>
+          <v-icon
+            :color="connectionStatus === 'connected' ? 'success' : connectionStatus === 'checking' ? 'warning' : 'error'"
+          >
+            mdi-circle
+          </v-icon>
+        </template>
+      </v-text-field>
       <v-select
         v-model="formSettings.systemModel"
         class="mb-4"
@@ -80,7 +94,8 @@
         item-title="name"
         item-value="id"
         :items="availableModels"
-        label="Model for titles"
+        label="General model"
+        :loading="connectionStatus === 'checking'"
         variant="solo-filled"
       />
       <v-textarea
@@ -103,7 +118,7 @@
     <v-col>
       <v-btn
         block
-        color="primary"
+        color="blue"
         :disabled="!isFormValid"
         type="submit"
         variant="flat"

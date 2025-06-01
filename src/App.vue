@@ -6,9 +6,11 @@
   import { useAppStore } from '@/stores/app.ts';
   import { useChatActions } from '@/composables/useChatActions.ts';
   import { useRoute } from 'vue-router';
+  import { useSettingsStore } from '@/stores/settings.ts';
 
   const app = useAppStore();
   const chat = useChatStore();
+  const settingsStore = useSettingsStore();
   const route = useRoute();
   const { selectChat } = useChatActions();
   const { isChatPage } = useAppRouting();
@@ -74,7 +76,7 @@
     <v-app-bar
       v-if="isElectron"
       app
-      dark
+      :dark="settingsStore.isDarkTheme"
       density="compact"
       flat
     >

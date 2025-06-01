@@ -54,11 +54,11 @@
   &::before {
     content: '';
     width: 100%;
-    height: 30px;
+    height: 20px;
     pointer-events: none;
-    background-image: linear-gradient(to bottom, rgba(var(--v-theme-surface-rgba), 0.8), transparent);
+    background-image: linear-gradient(to bottom, rgba(var(--v-theme-surface-rgba), 0.5), transparent);
     position: absolute;
-    bottom: -30px;
+    bottom: -20px;
     left: 0;
     z-index: 2;
   }
@@ -76,11 +76,11 @@
   &::before {
     content: '';
     width: 100%;
-    height: 30px;
+    height: 20px;
     pointer-events: none;
-    background-image: linear-gradient(to top, rgba(var(--v-theme-surface-rgba), 0.8), transparent);
+    background-image: linear-gradient(to top, rgba(var(--v-theme-surface-rgba), 0.5), transparent);
     position: absolute;
-    top: -30px;
+    top: -20px;
     left: 0;
   }
 }

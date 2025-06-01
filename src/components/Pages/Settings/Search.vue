@@ -3,38 +3,32 @@
   import { useSettingsStore } from '@/stores/settings';
   import { useChatStore } from '@/stores/chat';
   import { useAlert } from '@/plugins/alertPlugin';
+  import type { ISettings } from '@/types/settings.ts';
 
   const settingsStore = useSettingsStore();
   const chatStore = useChatStore();
   const { showSnackbar } = useAlert();
 
-  interface FormSettings {
-    searchPrompt: string;
-    searxngUrl: string;
-    searchModel: string;
-  }
-
-  const formSettings = ref<FormSettings>({
-    searchPrompt: settingsStore.settings.presetsPrompts.find(p => p.type === 'search')?.value || '',
-    searxngUrl: settingsStore.settings.searxngUrl || '',
+  const formSettings = ref<Partial<ISettings>>({
+    searxngURL: settingsStore.settings.searxngURL || '',
     searchModel: settingsStore.settings.searchModel || '',
   });
 
-  const availableModels = computed(() => chatStore.models || []);
+  const availableModels = computed(() => [
+    { name: 'General model', id: '' },
+    ...(chatStore.models || []),
+  ]);
 
   const isFormValid = computed(() => {
     return (
-      formSettings.value.searxngUrl.trim() !== '' &&
-      /^https?:\/\/[^\s/$.?#].[^\s]*$/.test(formSettings.value.searxngUrl)
+      formSettings.value.searxngURL?.trim() !== '' &&
+      /^https?:\/\/[^\s/$.?#].[^\s]*$/.test(formSettings.value.searxngURL || '')
     );
   });
 
   const saveSettings = () => {
-    const updatedPresets = settingsStore.settings.presetsPrompts.filter(p => p.type !== 'search');
-    updatedPresets.push({ type: 'search', value: formSettings.value.searchPrompt });
     settingsStore.updateSettings({
-      presetsPrompts: updatedPresets,
-      searxngUrl: formSettings.value.searxngUrl,
+      searxngURL: formSettings.value.searxngURL,
       searchModel: formSettings.value.searchModel,
     });
     showSnackbar({ message: 'Search settings saved', type: 'success' });
@@ -42,8 +36,7 @@
 
   const resetSettings = () => {
     formSettings.value = {
-      searchPrompt: '',
-      searxngUrl: '',
+      searxngURL: '',
       searchModel: '',
     };
     settingsStore.resetSettings();
@@ -57,18 +50,10 @@
   </v-card-title>
   <v-card-text>
     <v-form @submit.prevent="saveSettings">
-      <v-textarea
-        v-model="formSettings.searchPrompt"
-        class="mb-4"
-        label="Search prompt"
-        rows="4"
-        variant="solo-filled"
-      />
       <v-text-field
-        v-model="formSettings.searxngUrl"
+        v-model="formSettings.searxngURL"
         class="mb-4"
-        label="SearxNG URL"
-        :rules="[v => !!v || 'URL is required', v => /^https?:\/\/[^\s/$.?#].[^\s]*$/.test(v) || 'Invalid URL format']"
+        label="SearXNG URL"
         variant="solo-filled"
       />
       <v-select
@@ -86,10 +71,17 @@
   </v-card-text>
   <v-card-actions>
     <v-col>
-      <v-btn block color="primary" :disabled="!isFormValid" type="submit">Save</v-btn>
+      <v-btn
+        block
+        color="blue"
+        :disabled="!isFormValid"
+        type="submit"
+        variant="flat"
+        @click="saveSettings"
+      >Save</v-btn>
     </v-col>
     <v-col>
-      <v-btn block color="warning" variant="solo-filled" @click="resetSettings">Reset</v-btn>
+      <v-btn block variant="flat" @click="resetSettings">Reset</v-btn>
     </v-col>
   </v-card-actions>
 </template>

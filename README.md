@@ -29,7 +29,7 @@ Download and configure via Ollama:
 2. **RAG model** (used for persistent memory)
 3. **Image generation model**
 
-### 🌐 Optional: SearxNG Search Engine
+### 🌐 Optional: SearXNG Search Engine
 
 To enable search, run SearxNG:
 
