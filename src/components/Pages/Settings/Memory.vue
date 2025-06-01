@@ -10,7 +10,7 @@
   const { showSnackbar } = useAlert();
 
   const formSettings = ref<Partial<ISettings>>({
-    memoryModel: settingsStore.settings.memoryModel || '',
+    memoryModel: settingsStore.settings.memoryModel || settingsStore.settings.systemModel || settingsStore.settings.selectedModel || '',
     memoryPrompt: settingsStore.settings.memoryPrompt,
   });
 

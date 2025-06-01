@@ -7,9 +7,12 @@
   import { useChatActions } from '@/composables/useChatActions.ts';
   import { useRoute } from 'vue-router';
   import { useSettingsStore } from '@/stores/settings.ts';
+  import { useMemoryStore } from '@/stores/memory.ts';
+  import { waitForBackend } from '@/api/chats.ts';
 
   const app = useAppStore();
   const chat = useChatStore();
+  const memory = useMemoryStore();
   const settingsStore = useSettingsStore();
   const route = useRoute();
   const { selectChat } = useChatActions();
@@ -18,7 +21,9 @@
   const isElectron = !!(window as any).electronAPI;
 
   onMounted(async () => {
-    await Promise.all([chat.fetchModels(), chat.initialize()]);
+    await chat.checkOllamaConnection();
+    await waitForBackend();
+    await Promise.all([chat.fetchModels(), chat.fetchChats(), memory.fetchMemory()]);
 
     if (chat.error || !chat.chats?.length || window.location.pathname !== '/') {
       return;

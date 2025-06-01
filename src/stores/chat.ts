@@ -1,16 +1,8 @@
 import { defineStore } from 'pinia';
 import { useHttpService } from '@/plugins/httpPlugin';
-import {
-  checkBackendHealth,
-  clearAllChats,
-  deleteChat,
-  loadChats,
-  loadMemory,
-  saveChat,
-  saveMemory,
-} from '@/api/chats';
+import { clearAllChats, deleteChat, loadChats, saveChat, waitForBackend } from '@/api/chats';
 import type { OllamaModel, OllamaTagsResponse } from '@/types/ollama.ts';
-import { type Attachment, AttachmentType, type Chat, type MemoryEntry, type Message } from '@/types/chats.ts';
+import { type Attachment, AttachmentType, type Chat, type Message } from '@/types/chats.ts';
 import { throttle } from '@/utils/helpers.ts';
 import type { ISettings } from '@/types/settings.ts';
 import { useSettingsStore } from '@/stores/settings.ts';
@@ -31,8 +23,6 @@ export const useChatStore = defineStore('chat', {
       lastConnectionCheck: 0,
       models: [] as OllamaModel[],
       chats: [] as Chat[],
-      memory: [] as MemoryEntry[],
-      activeSystemPrompt: settings.systemPrompt ?? '',
       activeChatId: '',
       isGeneratingTitle: false,
       isSending: false,
@@ -46,7 +36,7 @@ export const useChatStore = defineStore('chat', {
       return state.chats.find(chat => chat.id === state.activeChatId);
     },
     selectedModel (): string {
-      return this.settings.selectedModel || this.settings.defaultModel || this.models[0]?.name || '';
+      return this.settings.selectedModel || this.settings.systemModel || this.models[0]?.name || '';
     },
   },
   actions: {
@@ -59,48 +49,16 @@ export const useChatStore = defineStore('chat', {
       return this.connectionStatus === 'connected';
     },
 
-    async initialize () {
-      await Promise.all([this.fetchChats(), this.fetchMemory()]);
-    },
-
     async fetchChats () {
       this.loading = true;
       this.error = null;
       try {
-        await this.waitForBackend();
+        await waitForBackend();
         this.chats = await loadChats();
       } catch (err: any) {
-        this.error = err.message;
+        this.error = err?.message;
       } finally {
         this.loading = false;
-      }
-    },
-
-    async fetchMemory () {
-      this.loading = true;
-      this.error = null;
-      try {
-        await this.waitForBackend();
-        this.memory = await loadMemory();
-      } catch (err: any) {
-        this.error = err.message;
-      } finally {
-        this.loading = false;
-      }
-    },
-
-    async waitForBackend (maxRetries = 10, delay = 1000) {
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-          await checkBackendHealth();
-          return;
-        } catch (err) {
-          if (attempt === maxRetries) {
-            throw new Error('Backend is not available after maximum retries');
-          }
-
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
       }
     },
 
@@ -137,7 +95,7 @@ export const useChatStore = defineStore('chat', {
         id: crypto.randomUUID(),
         title: this.settings.defaultChatTitle,
         messages: [],
-        timestamp: new Date().getTime(),
+        timestamp: Date.now(),
       };
 
       await this.persistChat(newChat.id);
@@ -299,7 +257,8 @@ export const useChatStore = defineStore('chat', {
     async sendMessage (
       chatId: string,
       content: string,
-      attachmentContent: Attachment | null = null
+      attachmentContent?: Attachment | null = null,
+      memoryContent?: string | null = null,
     ): Promise<void> {
       try {
         const chat = this.activeChat;
@@ -339,13 +298,13 @@ export const useChatStore = defineStore('chat', {
           userMessageId = await this.addMessage(chatId, {
             role: 'user',
             content: finalContent,
-            timestamp: new Date().getTime(),
+            timestamp: Date.now(),
           }, mappedAttachment);
         } else {
           userMessageId = await this.addMessage(chatId, {
             role: 'user',
             content: finalContent,
-            timestamp: new Date().getTime(),
+            timestamp: Date.now(),
           });
         }
 
@@ -453,12 +412,7 @@ export const useChatStore = defineStore('chat', {
             }
           }
         } else {
-          // Формируем сообщения с добавлением системного промпта и памяти
-          const memoryContent = this.memory.length > 0
-            ? 'Memory context:\n' + this.memory.map(entry => entry.content).join('\n---\n') + '\n---\n'
-            : '';
-
-          const systemPrompt = this.activeSystemPrompt || this.settings.systemPrompt || '';
+          const systemPrompt = this.settings.systemPrompt || '';
 
           const messagesToSend = [
             { role: 'system', content: systemPrompt },
@@ -609,71 +563,6 @@ export const useChatStore = defineStore('chat', {
         type: prevMessage.attachmentMeta?.type || AttachmentType.TEXT,
         meta: prevMessage.attachmentMeta as File,
       } as Attachment : null);
-    },
-
-    async saveSummary (chatId: string, messageId: string): Promise<string | null> {
-      const chat = this.getChat(chatId);
-      if (!chat) {
-        console.error(`Chat with ID ${chatId} not found`);
-        return null;
-      }
-
-      const messageIndex = chat.messages.findIndex(m => m.id === messageId);
-      const recentMessages = chat.messages.slice(Math.max(0, messageIndex - 3), messageIndex + 1);
-
-      try {
-        const response = await this.http.request({
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          url: `${this.settings.ollamaURL}/api/chat`,
-          data: {
-            model: this.settings.systemModel,
-            messages: [
-              { role: 'system', content: this.settings.memoryPrompt },
-              ...recentMessages,
-            ],
-            stream: false,
-            format: {
-              type: 'object',
-              properties: {
-                facts: {
-                  type: 'array',
-                  items: { type: 'string' },
-                },
-              },
-              required: ['facts'],
-            },
-          },
-        });
-
-        let facts: string[] = [];
-        try {
-          facts = JSON.parse(response?.message?.content)?.facts || [];
-        } catch (parseError) {
-          console.error(`Failed to parse API response for chat ${chatId}, message ${messageId}:`, parseError);
-          return null;
-        }
-
-        if (!Array.isArray(facts) || facts.length === 0) {
-          console.warn(`Empty or invalid facts received for chat ${chatId}, message ${messageId}`);
-          return null;
-        }
-
-        const summary = facts.join('. ') + '.';
-        const newEntry: MemoryEntry = {
-          content: summary,
-          timestamp: Date.now(),
-        };
-
-        this.memory = [...(this.memory || []), newEntry];
-        await saveMemory(this.memory);
-
-        return summary;
-      } catch (error) {
-        console.error(`Error saving summary for chat ${chatId}, message ${messageId}:`, error);
-        this.error = error instanceof Error ? error.message : 'Failed to save summary';
-        return null;
-      }
     },
 
     async fetchModels () {

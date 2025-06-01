@@ -9,12 +9,14 @@
   import { copyToClipboard } from '@/utils/chatUtils';
   import AttachmentChip from '@/components/Pages/Chat/AttachmentChip.vue';
   import ThinkPreview from '@/components/Pages/Chat/ThinkPreview.vue';
+  import { useMemoryStore } from '@/stores/memory.ts';
 
   const props = defineProps<{
     message: Message;
   }>();
 
   const chat = useChatStore();
+  const memory = useMemoryStore();
   const { showSnackbar } = useAlert();
   const bubbleRef = ref();
   const isEditDialogOpen = ref(false);
@@ -65,7 +67,8 @@
         editedContent.value,
         props.message.attachmentContent
           ? { content: props.message.attachmentContent, type: props.message.attachmentMeta?.type || 'TEXT', meta: props.message.attachmentMeta as AttachmentMeta } as Attachment
-          : null
+          : null,
+        memory.getMemoryContent
       );
     } else {
       if (index === 0) return;
@@ -78,7 +81,8 @@
         prevMessage.content,
         prevMessage.attachmentContent
           ? { content: prevMessage.attachmentContent, type: prevMessage.attachmentMeta?.type || 'TEXT', meta: prevMessage.attachmentMeta as AttachmentMeta } as Attachment
-          : null
+          : null,
+        memory.getMemoryContent
       );
     }
 
@@ -130,7 +134,26 @@
     const chatId = chat.activeChatId;
     if (chatId) {
       try {
-        const result = await chat.saveSummary(chatId, props.message.id);
+        const activeChat = chat.chats.find(chat => chat.id === chatId) ?? null;
+
+        if (!activeChat) {
+          showSnackbar({ message: `Chat with ID ${chatId} not found`, type: 'warning' });
+          return;
+        }
+
+        const messageIndex = activeChat.messages.findIndex(
+          message => message.id === props.message.id
+        );
+
+        if (messageIndex === -1) {
+          showSnackbar({ message: `Message with ID ${props.message.id} not found in chat`, type: 'warning' });
+          return;
+        }
+
+        const startIndex = Math.max(0, messageIndex - 3);
+        const recentMessages = activeChat.messages.slice(startIndex, messageIndex + 1);
+
+        const result = await memory.saveSummary(recentMessages);
         showSnackbar({
           message: result ? 'Memory updated: ' + result : 'Nothing to save',
           type: result ? 'success' : 'warning',

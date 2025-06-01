@@ -2,6 +2,21 @@ import { getGraphQLClient, handleGraphQLError } from '@/utils/graphql';
 import { gql } from 'graphql-tag';
 import { AttachmentType, type Chat, type MemoryEntry } from '@/types/chats.ts';
 
+export async function waitForBackend (maxRetries = 10, delay = 1000) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await checkBackendHealth();
+      return;
+    } catch {
+      if (attempt === maxRetries) {
+        throw new Error('Backend is not available after maximum retries');
+      }
+
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+}
+
 export async function checkBackendHealth () {
   const client = await getGraphQLClient();
   const query = `

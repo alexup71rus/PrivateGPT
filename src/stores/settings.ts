@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { computed, reactive } from 'vue';
+import { reactive } from 'vue';
 import { DEFAULT_SETTINGS, type ISettings } from '@/types/settings.ts';
 
 export const useSettingsStore = defineStore('settings', {

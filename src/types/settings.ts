@@ -5,7 +5,7 @@ export const DEFAULT_SETTINGS = {
   /* --- */
   ollamaURL: 'http://localhost:11434' as string,
   selectedModel: '' as string,
-  defaultModel: '' as string,
+  systemModel: '' as string,
   memoryModel: '' as string,
   searchModel: '' as string,
   searxngURL: '' as string,

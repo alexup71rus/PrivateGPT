@@ -3,9 +3,11 @@
   import { useChatStore } from '@/stores/chat.ts';
   import { type Attachment, type AttachmentMeta, AttachmentType, type ChatModel } from '@/types/chats.ts';
   import { useSettingsStore } from '@/stores/settings.ts';
+  import { useMemoryStore } from '@/stores/memory.ts';
 
   const chat = useChatStore();
   const { settings, updateSettings } = useSettingsStore();
+  const memory = useMemoryStore();
   const textareaRef = ref<HTMLTextAreaElement>();
   const fileInputRef = ref<HTMLInputElement>();
   const activeChat = computed(() => chat.activeChat);
@@ -17,11 +19,11 @@
   const canSend = computed(() => chat.isSending ? false : messageText.value.trim());
 
   const modelNames = computed(() => chat.models?.map((model: ChatModel) => model.name) || []);
-  const selectedModel = ref(settings.selectedModel || settings.defaultModel);
-  const isChangedModel = computed(() => selectedModel.value !== settings.defaultModel);
-  const setDefaultModel = () => {
+  const selectedModel = ref(settings.selectedModel || settings.systemModel);
+  const isChangedModel = computed(() => selectedModel.value !== settings.systemModel);
+  const setSystemModel = () => {
     if (selectedModel.value) {
-      updateSettings({ defaultModel: selectedModel.value });
+      updateSettings({ systemModel: selectedModel.value });
     }
   };
   const modelSearch = ref('');
@@ -129,7 +131,7 @@
 
     chat.setIsSending(true);
     try {
-      await chat.sendMessage(activeChatId.value, messageText.value, { ...attachmentContent.value } as Attachment);
+      await chat.sendMessage(activeChatId.value, messageText.value, { ...attachmentContent.value } as Attachment, memory.getMemoryContent);
       messageText.value = '';
       attachment.value = null;
       attachmentContent.value = null;
@@ -155,7 +157,7 @@
     nextTick(() => textareaRef.value?.focus());
   });
 
-  watch(() => [chat.activeChatId, chat.isSending, chat.selectedModel], (newVal, oldVal) => {
+  watch(() => [chat.activeChatId, chat.isSending, chat.selectedModel], () => {
     nextTick(() => textareaRef.value?.focus());
   }, { deep: true })
 </script>
@@ -221,7 +223,7 @@
                       density="compact"
                       icon="mdi-check-circle"
                       variant="text"
-                      @click="setDefaultModel"
+                      @click="setSystemModel"
                     />
                   </div>
                 </v-list-item>
@@ -247,7 +249,7 @@
         :color="'red'"
         icon="mdi-backup-restore"
         variant="tonal"
-        @click="selectModel(settings.defaultModel)"
+        @click="selectModel(settings.systemModel)"
       />
       <v-spacer />
       <v-btn
