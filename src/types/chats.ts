@@ -36,3 +36,7 @@ export interface Chat {
   messages: Message[];
   timestamp: number;
 }
+
+export interface ChatModel {
+  name: string;
+}

@@ -19,13 +19,8 @@
   const canSend = computed(() => chat.isSending ? false : messageText.value.trim());
 
   const modelNames = computed(() => chat.models?.map((model: ChatModel) => model.name) || []);
-  const selectedModel = ref(settings.selectedModel || settings.systemModel);
-  const isChangedModel = computed(() => selectedModel.value !== settings.systemModel);
-  const setSystemModel = () => {
-    if (selectedModel.value) {
-      updateSettings({ systemModel: selectedModel.value });
-    }
-  };
+  const selectedModel = ref(settings.selectedModel || settings.defaultModel || settings.systemModel);
+  const isChangedModel = computed(() => settings.defaultModel ? selectedModel.value !== settings.defaultModel : selectedModel.value !== settings.systemModel);
   const modelSearch = ref('');
   const filteredModels = computed(() =>
     modelSearch.value
@@ -33,6 +28,12 @@
         name.toLowerCase().includes(modelSearch.value.toLowerCase()))
       : modelNames.value
   );
+
+  const setDefaultModel = () => {
+    if (selectedModel.value) {
+      updateSettings({ defaultModel: selectedModel.value });
+    }
+  };
 
   function selectModel (model: string) {
     selectedModel.value = model;
@@ -180,7 +181,7 @@
         density="comfortable"
         :disabled="chat.isSending || chat.models?.length === 0"
         hide-details
-        placeholder="Enter message..."
+        placeholder="Enter a message..."
         rows="1"
         variant="solo-filled"
         @keydown.enter.exact.prevent.stop
@@ -223,7 +224,7 @@
                       density="compact"
                       icon="mdi-check-circle"
                       variant="text"
-                      @click="setSystemModel"
+                      @click="setDefaultModel"
                     />
                   </div>
                 </v-list-item>
@@ -249,7 +250,7 @@
         :color="'red'"
         icon="mdi-backup-restore"
         variant="tonal"
-        @click="selectModel(settings.systemModel)"
+        @click="selectModel(settings.defaultModel)"
       />
       <v-spacer />
       <v-btn

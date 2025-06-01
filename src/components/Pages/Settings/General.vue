@@ -3,7 +3,7 @@
   import { useSettingsStore } from '@/stores/settings';
   import { useChatStore } from '@/stores/chat';
   import { useAlert } from '@/plugins/alertPlugin';
-  import type { ISettings } from '@/types/settings.ts';
+  import { DEFAULT_SETTINGS, type ISettings } from '@/types/settings.ts';
 
   const settingsStore = useSettingsStore();
   const chatStore = useChatStore();
@@ -15,6 +15,7 @@
     systemModel: settingsStore.settings.systemModel,
     titlePrompt: settingsStore.settings.titlePrompt,
     defaultChatTitle: settingsStore.settings.defaultChatTitle,
+    chatScrollMode: settingsStore.settings.chatScrollMode || 'scroll',
   });
 
   const availableModels = computed(() => chatStore.models || []);
@@ -42,11 +43,12 @@
 
   const resetSettings = () => {
     formSettings.value = {
-      theme: 'system',
-      ollamaURL: 'http://localhost:11434',
-      systemModel: 'llama3.2:latest',
-      titlePrompt: settingsStore.settings.titlePrompt,
-      defaultChatTitle: 'New chat',
+      theme: DEFAULT_SETTINGS.theme,
+      ollamaURL: DEFAULT_SETTINGS.ollamaURL,
+      systemModel: DEFAULT_SETTINGS.systemModel,
+      titlePrompt: DEFAULT_SETTINGS.titlePrompt,
+      defaultChatTitle: DEFAULT_SETTINGS.defaultChatTitle,
+      chatScrollMode: DEFAULT_SETTINGS.chatScrollMode || 'scroll',
     };
     settingsStore.resetSettings();
     showSnackbar({ message: 'General settings reset', type: 'success' });
@@ -72,6 +74,17 @@
         label="Theme"
         variant="solo-filled"
       />
+
+      <v-select
+        v-model="formSettings.chatScrollMode"
+        class="mb-4"
+        :items="[{ title: 'Gap', value: 'gap' }, { title: 'Scroll', value: 'scroll' }]"
+        label="Chat Scroll Mode"
+        variant="solo-filled"
+      />
+
+      <v-divider class="mb-10" />
+
       <v-text-field
         v-model="formSettings.ollamaURL"
         class="mb-4"
@@ -94,7 +107,7 @@
         item-title="name"
         item-value="id"
         :items="availableModels"
-        label="General model"
+        label="General model (for features)"
         :loading="connectionStatus === 'checking'"
         variant="solo-filled"
       />
