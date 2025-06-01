@@ -6,6 +6,7 @@ import { type Attachment, AttachmentType, type Chat, type Message } from '@/type
 import { throttle } from '@/utils/helpers.ts';
 import type { ISettings } from '@/types/settings.ts';
 import { useSettingsStore } from '@/stores/settings.ts';
+import { useMemoryStore } from '@/stores/memory.ts';
 
 const throttledSaveChat = throttle(async (chat: Chat) => {
   await saveChat(chat);
@@ -15,10 +16,12 @@ export const useChatStore = defineStore('chat', {
   state: () => {
     const { http } = useHttpService();
     const { settings } = useSettingsStore();
+    const memory = useMemoryStore();
 
     return {
       http,
       settings: settings as ISettings,
+      memory,
       connectionStatus: 'disconnected' as 'connected' | 'disconnected' | 'checking',
       lastConnectionCheck: 0,
       models: [] as OllamaModel[],
@@ -562,7 +565,7 @@ export const useChatStore = defineStore('chat', {
         content: prevMessage.attachmentContent,
         type: prevMessage.attachmentMeta?.type || AttachmentType.TEXT,
         meta: prevMessage.attachmentMeta as File,
-      } as Attachment : null);
+      } as Attachment : null, this.memory.getMemoryContent);
     },
 
     async fetchModels () {
