@@ -6,32 +6,31 @@
 
 > A full-featured local AI client with private memory, fast search, flexible prompts, and a clean codebase you can extend freely.
 
-
-<img src="./src/assets/img.png" alt="Logo" width="100%" />
+<img src="./src/assets/img.png" alt="Screenshot" width="100%" />
 
 ### 🚀 Features
 
 * 💬 Works with local LLMs via **Ollama**
 * 🧠 Persistent memory (summarization-based), like GPT
-* 🖼️ Image generation
-* 📁 Chat folders for organizing by project
-* 🔍 Search to the internet
-* 📄 Upload and analyze documents
+* 🖼️ Image generation (in development)
+* 📁 Chat folders for organizing by project (in development)
+* 🔍 Internet search (in development)
+* 📄 Upload and analyze documents (RAG in development, supports only text)
 * 🖼️ Upload and view images
-* ⚡ Custom prompt snippets
+* ⚡ Custom prompt snippets (in development)
 * ⚙️ Minimal, easily adaptable codebase
 
 ### ⚙️ Required Models
 
 Download and configure via Ollama:
 
-1. **Summarization model** (used for persistent memory and generation titles)
-2. **RAG model** (used for persistent memory)
+1. **Summarization model** (used for persistent memory and generating titles)
+2. **RAG model** (used for document-based retrieval and persistent memory)
 3. **Image generation model**
 
 ### 🌐 Optional: SearXNG Search Engine
 
-To enable search, run SearxNG:
+To enable internet search, you can run SearXNG:
 
 ```bash
 docker run --restart=always -d -p 8888:8080 \
@@ -53,12 +52,27 @@ docker run -d \
 
 ### 📦 Installation
 
+This is a **monorepo** containing both frontend and backend parts.
+
+First, install dependencies for both root and backend:
+
 ```bash
 pnpm install
+pnpm --prefix backend install
+```
+
+Then, to run the app in development mode:
+
+```bash
 pnpm dev
+```
+
+Or to launch the Electron app:
+
+```bash
+pnpm dev:electron
 ```
 
 ### 📄 License
 
-[Apache License
-](https://github.com/alexup71rus/PrivateGPT/blob/master/LICENSE)
+[Apache License](https://github.com/alexup71rus/PrivateGPT/blob/master/LICENSE)
