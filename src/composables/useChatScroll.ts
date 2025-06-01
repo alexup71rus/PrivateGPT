@@ -1,8 +1,8 @@
 import { nextTick, onMounted, onUnmounted, type Ref, ref, watch } from 'vue';
-import type { Chat } from "@/types/chats.ts";
-import {useSettingsStore} from "@/stores/settings.ts";
+import type { Chat } from '@/types/chats.ts';
+import { useSettingsStore } from '@/stores/settings.ts';
 
-export function useChatScroll(messages: Ref<Chat['messages'] | undefined>, activeChatId: string) {
+export function useChatScroll (messages: Ref<Chat['messages'] | undefined>, activeChatId: string) {
   const { settings, updateSettings } = useSettingsStore();
   const chatMessagesRef = ref<HTMLDivElement | null>(null);
   const isShowScrollDown = ref(false);
@@ -18,7 +18,7 @@ export function useChatScroll(messages: Ref<Chat['messages'] | undefined>, activ
     if (chatMessagesRef.value) {
       chatMessagesRef.value.scrollTo({
         top: chatMessagesRef.value.scrollHeight,
-        behavior: isSmooth ? 'smooth' : 'instant'
+        behavior: isSmooth ? 'smooth' : 'instant',
       });
       isShowScrollDown.value = false;
     } else {
@@ -29,7 +29,7 @@ export function useChatScroll(messages: Ref<Chat['messages'] | undefined>, activ
   const checkScrollPosition = () => {
     if (chatMessagesRef.value) {
       const { scrollTop, scrollHeight, clientHeight } = chatMessagesRef.value;
-      isShowScrollDown.value = scrollTop + clientHeight < scrollHeight - 10;
+      isShowScrollDown.value = scrollTop + clientHeight < scrollHeight - 500;
     }
   };
 
