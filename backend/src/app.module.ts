@@ -8,6 +8,7 @@ import { ChatsModule } from './chats/chats.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AppResolver } from './app.resolver';
+import { SearchModule } from './search/search.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { AppResolver } from './app.resolver';
     }),
 
     ChatsModule,
+    SearchModule,
   ],
   controllers: [AppController],
   providers: [AppService, AppResolver],

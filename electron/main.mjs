@@ -82,7 +82,7 @@ function createWindow () {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: true, // Дополнительная безопасность
+      sandbox: true,
       preload: path.join(__dirname, 'preload.js'),
     },
   });

@@ -15,7 +15,6 @@
   const messageText = ref('');
   const attachment = ref<File | null>(null);
   const attachmentContent = ref<{ content: string, type: AttachmentType, meta: AttachmentMeta } | null>(null);
-  const isSearch = ref(settings.isSearchAsDefault);
   const canSend = computed(() => !chat.isSending && !!messageText.value.trim());
 
   const modelNames = computed(() => chat.models?.map((model: ChatModel) => model.name) || []);
@@ -249,11 +248,11 @@
       </v-btn>
       <v-btn
         class="search-btn"
-        :color="isSearch ? 'blue' : 'white'"
+        :color="chat.isSearchActive ? 'blue' : 'white'"
         :disabled="!chat.models?.length"
         prepend-icon="mdi-magnify"
         variant="tonal"
-        @click="isSearch = !isSearch"
+        @click="chat.isSearchActive = !chat.isSearchActive"
       >
         Search
       </v-btn>

@@ -1,10 +1,10 @@
 import { defineStore } from 'pinia';
 import { useHttpService } from '@/plugins/httpPlugin';
-import { clearAllChats, deleteChat, loadChats, saveChat, waitForBackend } from '@/api/chats';
-import type { OllamaModel, OllamaTagsResponse } from '@/types/ollama.ts';
-import type { Attachment, AttachmentType, Chat, Message } from '@/types/chats.ts';
+import { clearAllChats, deleteChat, loadChats, saveChat, searchBackend, waitForBackend } from '@/api/chats';
+import { type OllamaModel, type OllamaTagsResponse } from '@/types/ollama.ts';
+import { type Attachment, type AttachmentType, type Chat, type Message } from '@/types/chats.ts';
 import { throttle } from '@/utils/helpers.ts';
-import type { ISettings } from '@/types/settings.ts';
+import { type ISettings } from '@/types/settings.ts';
 import { useSettingsStore } from '@/stores/settings.ts';
 import { useMemoryStore } from '@/stores/memory.ts';
 
@@ -56,6 +56,7 @@ export const useChatStore = defineStore('chat', {
       chats: [] as Chat[],
       activeChatId: '',
       isGeneratingTitle: false,
+      isSearchActive: settings.isSearchAsDefault,
       isSending: false,
       abortController: null as AbortController | null,
       loading: false,
@@ -244,6 +245,22 @@ export const useChatStore = defineStore('chat', {
         let finalContent = content;
         let images: string[] | undefined;
         let userMessageId: string | null;
+        let searchResults: string | null = null;
+
+        if (this.isSearchActive) {
+          try {
+            searchResults = await searchBackend(content, this.settings.searxngURL, this.settings.searchFormat);
+            if (searchResults) {
+              finalContent = `<search_results>${searchResults}</search_results>${content}`;
+            }
+          } catch (error) {
+            console.error('Search failed:', error);
+            // Continue without search results if search fails
+          }
+        }
+
+        // console.log(searchResults);
+        // return;
 
         if (attachmentContent && Object.keys(attachmentContent).length) {
           const file = attachmentContent.meta;
@@ -252,7 +269,7 @@ export const useChatStore = defineStore('chat', {
             images = [attachmentContent.content];
             finalContent = `<hidden>${metaInfo}</hidden>${finalContent}`;
           } else if (attachmentContent.type === AttachmentType.TEXT) {
-            finalContent = `<hidden>\n${attachmentContent.content}\n${metaInfo}\n</hidden>${content}`;
+            finalContent = `<hidden>\n${attachmentContent.content}\n${metaInfo}\n</hidden>${finalContent}`;
           }
 
           userMessageId = await this.addMessage(chatId, { role: 'user', content: finalContent, timestamp: Date.now() }, {
@@ -297,6 +314,7 @@ export const useChatStore = defineStore('chat', {
             messages: [
               { role: 'system', content: this.settings.systemPrompt || '' },
               ...(memoryContent ? [{ role: 'system', content: memoryContent }] : []),
+              ...(searchResults ? [{ role: 'system', content: `Search results: ${searchResults}` }] : []),
               ...chat.messages.map(msg => ({
                 role: msg.role,
                 content: msg.content,
@@ -339,7 +357,7 @@ export const useChatStore = defineStore('chat', {
           });
           assistantContent += chunkContent;
           await this.updateMessage(chatId, assistantMessageId!, assistantContent, true, thinkStartTime && isInThinkBlock ? Date.now() - thinkStartTime : undefined, isInThinkBlock);
-        }, this.abortController.signal);
+        });
 
         if (assistantMessageId) {
           const finalThinkTime = isInThinkBlock && thinkStartTime ? Date.now() - thinkStartTime : this.findById(chat.messages, assistantMessageId)?.thinkTime;

@@ -76,3 +76,6 @@ pnpm dev:electron
 ### 📄 License
 
 [Apache License](https://github.com/alexup71rus/PrivateGPT/blob/master/LICENSE)
+
+### 📧 Contact
+TG: [@alexup71rus](https://t.me/alexup71rus)

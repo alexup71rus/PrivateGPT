@@ -198,3 +198,22 @@ export async function saveMemory (memory: MemoryEntry[]): Promise<void> {
     handleGraphQLError(error);
   }
 }
+
+export async function searchBackend (query: string, url: string, format: string): Promise<string | null> {
+  try {
+    const client = await getGraphQLClient();
+    const gqlQuery = gql`
+      query Search($query: String!, $url: String!, $format: String!) {
+        search(query: $query, url: $url, format: $format) {
+          results
+        }
+      }
+    `;
+    const { search } = await client.request<{ search: { results: string } }>(gqlQuery, { query, url, format });
+
+    return search.results || null;
+  } catch (error) {
+    handleGraphQLError(error);
+    return null;
+  }
+}

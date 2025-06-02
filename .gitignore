@@ -22,3 +22,6 @@ schema.gql
 *.njsproj
 *.sln
 *.sw?
+
+#
+*.sqlite
