@@ -12,6 +12,7 @@
   const formSettings = ref<Partial<ISettings>>({
     searxngURL: settingsStore.settings.searxngURL || '',
     searchModel: settingsStore.settings.searchModel || '',
+    searchFormat: settingsStore.settings.searchFormat || 'json',
   });
 
   const availableModels = computed(() => [
@@ -19,10 +20,16 @@
     ...(chatStore.models || []),
   ]);
 
+  const searchFormats = [
+    { name: 'JSON', id: 'json' },
+    { name: 'HTML', id: 'html' },
+  ];
+
   const isFormValid = computed(() => {
     return (
       formSettings.value.searxngURL?.trim() !== '' &&
-      /^https?:\/\/[^\s/$.?#].[^\s]*$/.test(formSettings.value.searxngURL || '')
+      /^https?:\/\/[^\s/$.?#].[^\s]*$/.test(formSettings.value.searxngURL || '') &&
+      ['html', 'json'].includes(formSettings.value.searchFormat || '')
     );
   });
 
@@ -30,6 +37,7 @@
     settingsStore.updateSettings({
       searxngURL: formSettings.value.searxngURL,
       searchModel: formSettings.value.searchModel,
+      searchFormat: formSettings.value.searchFormat,
     });
     showSnackbar({ message: 'Search settings saved', type: 'success' });
   };
@@ -38,6 +46,7 @@
     formSettings.value = {
       searxngURL: '',
       searchModel: '',
+      searchFormat: 'json',
     };
     settingsStore.resetSettings();
     showSnackbar({ message: 'Search settings reset', type: 'success' });
@@ -53,7 +62,18 @@
       <v-text-field
         v-model="formSettings.searxngURL"
         class="mb-4"
+        :hint="'URL should include %s where the search query will be inserted'"
         label="SearXNG URL"
+        persistent-hint
+        variant="solo-filled"
+      />
+      <v-select
+        v-model="formSettings.searchFormat"
+        class="mb-4"
+        item-title="name"
+        item-value="id"
+        :items="searchFormats"
+        label="Search result format"
         variant="solo-filled"
       />
       <v-select

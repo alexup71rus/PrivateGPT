@@ -16,46 +16,33 @@
   const attachment = ref<File | null>(null);
   const attachmentContent = ref<{ content: string, type: AttachmentType, meta: AttachmentMeta } | null>(null);
   const isSearch = ref(settings.isSearchAsDefault);
-  const canSend = computed(() => chat.isSending ? false : messageText.value.trim());
+  const canSend = computed(() => !chat.isSending && !!messageText.value.trim());
 
   const modelNames = computed(() => chat.models?.map((model: ChatModel) => model.name) || []);
   const selectedModel = ref(settings.selectedModel || settings.defaultModel || settings.systemModel);
-  const isChangedModel = computed(() => settings.defaultModel ? selectedModel.value !== settings.defaultModel : selectedModel.value !== settings.systemModel);
+  const isChangedModel = computed(() => selectedModel.value !== (settings.defaultModel || settings.systemModel));
   const modelSearch = ref('');
   const filteredModels = computed(() =>
     modelSearch.value
-      ? modelNames.value.filter(name =>
-        name.toLowerCase().includes(modelSearch.value.toLowerCase()))
+      ? modelNames.value.filter(name => name.toLowerCase().includes(modelSearch.value.toLowerCase()))
       : modelNames.value
   );
 
-  const setDefaultModel = () => {
-    if (selectedModel.value) {
-      updateSettings({ defaultModel: selectedModel.value });
-    }
-  };
+  const setDefaultModel = () => selectedModel.value && updateSettings({ defaultModel: selectedModel.value });
 
   function selectModel (model: string) {
     selectedModel.value = model;
-    updateSettings({ selectedModel: selectedModel.value });
+    updateSettings({ selectedModel: model });
   }
 
   function handleAttachClick () {
     fileInputRef.value?.click();
   }
 
-  function handleFilesSelected (event: Event) {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-
-    if (!file) return;
-
-    const isImage = /\.(png|jpe?g)$/i.test(file.name);
+  function processFile (file: File, isImage: boolean) {
     const reader = new FileReader();
-
     reader.onload = () => {
       const result = reader.result as string;
-
       if (isImage) {
         const img = new Image();
         img.src = result;
@@ -64,56 +51,43 @@
           let height = img.height;
           const maxWidth = 1024;
           const maxHeight = 768;
-
           if (width > maxWidth || height > maxHeight) {
             const ratio = Math.min(maxWidth / width, maxHeight / height);
             width = Math.round(width * ratio);
             height = Math.round(height * ratio);
           }
-
           const canvas = document.createElement('canvas');
           canvas.width = width;
           canvas.height = height;
           const ctx = canvas.getContext('2d')!;
           ctx.drawImage(img, 0, 0, width, height);
-
           const base64 = canvas.toDataURL('image/jpeg', 0.8);
           const compressedBase64 = base64.split(',')[1];
-
           attachmentContent.value = {
             content: compressedBase64,
             type: AttachmentType.IMAGE,
-            meta: {
-              name: file.name,
-              size: file.size,
-              type: AttachmentType.IMAGE,
-              lastModified: file.lastModified,
-            },
+            meta: { name: file.name, size: file.size, type: AttachmentType.IMAGE, lastModified: file.lastModified },
           };
         };
       } else {
         attachmentContent.value = {
           content: result,
           type: AttachmentType.TEXT,
-          meta: {
-            name: file.name,
-            size: file.size,
-            type: AttachmentType.TEXT,
-            lastModified: file.lastModified,
-          },
+          meta: { name: file.name, size: file.size, type: AttachmentType.TEXT, lastModified: file.lastModified },
         };
       }
-
       attachment.value = file;
     };
+    if (isImage) reader.readAsDataURL(file);
+    else reader.readAsText(file);
+  }
 
-    if (isImage) {
-      reader.readAsDataURL(file);
-    } else {
-      reader.readAsText(file);
-    }
-
-    input.value = '';
+  function handleFilesSelected (event: Event) {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    const isImage = /\.(png|jpe?g)$/i.test(file.name);
+    processFile(file, isImage);
+    (event.target as HTMLInputElement).value = '';
   }
 
   function removeAttachment () {
@@ -127,40 +101,40 @@
     sendMessage();
   }
 
-  async function sendMessage () {
-    if (!canSend.value) return;
-
+  async function withSending (action: () => Promise<void>) {
     chat.setIsSending(true);
     try {
-      await chat.sendMessage(activeChatId.value, messageText.value, { ...attachmentContent.value } as Attachment, memory.getMemoryContent);
-      messageText.value = '';
-      attachment.value = null;
-      attachmentContent.value = null;
+      await action();
     } finally {
       chat.setIsSending(false);
     }
   }
 
-  async function stopGeneration () {
-    if (chat.abortController) {
-      chat.abortController.abort();
-      chat.setIsSending(false);
+  async function sendMessage () {
+    if (!canSend.value) return;
+    await withSending(async () => {
+      await chat.sendMessage(activeChatId.value, messageText.value, { ...attachmentContent.value } as Attachment, memory.getMemoryContent);
+      messageText.value = '';
+      attachment.value = null;
+      attachmentContent.value = null;
+    });
+  }
 
-      const lastMessage = activeChat.value?.messages[activeChat.value.messages.length - 1];
-      if (lastMessage?.isLoading) {
-        await chat.updateMessage(activeChatId.value, lastMessage.id, lastMessage.content, false, lastMessage.thinkTime, false);
-        chat.setIsSending(false);
-      }
+  async function stopGeneration () {
+    if (!chat.abortController) return;
+    chat.abortController.abort();
+    chat.setIsSending(false);
+    const lastMessage = activeChat.value?.messages[activeChat.value.messages.length - 1];
+    if (lastMessage?.isLoading) {
+      await chat.updateMessage(activeChatId.value, lastMessage.id, lastMessage.content, false, lastMessage.thinkTime, false);
     }
   }
 
-  onMounted(() => {
-    nextTick(() => textareaRef.value?.focus());
-  });
+  onMounted(() => nextTick(() => textareaRef.value?.focus()));
 
   watch(() => [chat.activeChatId, chat.isSending, chat.selectedModel], () => {
     nextTick(() => textareaRef.value?.focus());
-  }, { deep: true })
+  }, { deep: true });
 </script>
 
 <template>
@@ -250,7 +224,7 @@
         :color="'red'"
         icon="mdi-backup-restore"
         variant="tonal"
-        @click="selectModel(settings.defaultModel)"
+        @click="selectModel(settings.defaultModel || settings.systemModel)"
       />
       <v-spacer />
       <v-btn

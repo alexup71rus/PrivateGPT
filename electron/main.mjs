@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
+import { spawn } from 'node:child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { spawn } from 'node:child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,7 +12,7 @@ const config = {
     port: 3001,
     env: {
       PORT: '3001',
-      CORS_ORIGIN: 'http://localhost:3000',
+      CORS_ORIGIN: 'http://localhost:3002',
     },
   },
   window: {
@@ -26,7 +26,7 @@ const config = {
 let mainWindow = null;
 let backendProcess = null;
 
-function startBackend() {
+function startBackend () {
   if (backendProcess) {
     console.warn('Backend process already running!');
     return;
@@ -39,18 +39,18 @@ function startBackend() {
     env: { ...process.env, ...config.backend.env },
   });
 
-  backendProcess.on('error', (err) => {
+  backendProcess.on('error', err => {
     console.error('❌ Backend failed to start:', err);
     backendProcess = null;
   });
 
-  backendProcess.on('exit', (code) => {
+  backendProcess.on('exit', code => {
     console.log(`🔴 Backend exited with code ${code}`);
     backendProcess = null;
   });
 }
 
-function setupIpcHandlers() {
+function setupIpcHandlers () {
   ipcMain.removeHandler('window:minimize');
   ipcMain.removeHandler('window:maximize');
   ipcMain.removeHandler('window:close');
@@ -65,7 +65,7 @@ function setupIpcHandlers() {
   ipcMain.handle('backend-port', () => config.backend.port);
 }
 
-function createWindow() {
+function createWindow () {
   if (mainWindow) {
     console.warn('Main window already exists! Focusing it instead.');
     mainWindow.focus();
@@ -89,7 +89,7 @@ function createWindow() {
 
   if (isDev) {
     console.log('🚀 Running in development mode');
-    mainWindow.loadURL('http://localhost:3000');
+    mainWindow.loadURL('http://localhost:3002');
     mainWindow.webContents.openDevTools();
   } else {
     console.log('🏁 Running in production mode');
@@ -119,7 +119,7 @@ function createWindow() {
   });
 }
 
-function cleanup() {
+function cleanup () {
   if (backendProcess) {
     console.log('Terminating backend process...');
     backendProcess.kill();
@@ -140,7 +140,7 @@ app.whenReady()
       }
     });
   })
-  .catch((err) => {
+  .catch(err => {
     console.error('Failed to start app:', err);
     cleanup();
     app.quit();

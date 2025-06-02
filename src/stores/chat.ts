@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import { useHttpService } from '@/plugins/httpPlugin';
 import { clearAllChats, deleteChat, loadChats, saveChat, waitForBackend } from '@/api/chats';
 import type { OllamaModel, OllamaTagsResponse } from '@/types/ollama.ts';
-import { type Attachment, AttachmentType, type Chat, type Message } from '@/types/chats.ts';
+import type { Attachment, AttachmentType, Chat, Message } from '@/types/chats.ts';
 import { throttle } from '@/utils/helpers.ts';
 import type { ISettings } from '@/types/settings.ts';
 import { useSettingsStore } from '@/stores/settings.ts';
@@ -11,6 +11,34 @@ import { useMemoryStore } from '@/stores/memory.ts';
 const throttledSaveChat = throttle(async (chat: Chat) => {
   await saveChat(chat);
 }, 800);
+
+const handleError = (error: unknown, defaultMessage: string): string => {
+  const message = error instanceof Error ? error.message : defaultMessage;
+  console.error(defaultMessage, error);
+  return message;
+};
+
+const processStream = async (
+  response: Response,
+  onChunk: (data: any) => Promise<void>
+) => {
+  if (!response.body) throw new Error('No response body');
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const lines = decoder.decode(value, { stream: true }).split('\n').filter(line => line.trim());
+    for (const line of lines) {
+      try {
+        const data = JSON.parse(line);
+        await onChunk(data);
+      } catch (e) {
+        console.error('Error parsing chunk:', e);
+      }
+    }
+  }
+};
 
 export const useChatStore = defineStore('chat', {
   state: () => {
@@ -35,12 +63,8 @@ export const useChatStore = defineStore('chat', {
     };
   },
   getters: {
-    activeChat (state): Chat | undefined {
-      return state.chats.find(chat => chat.id === state.activeChatId);
-    },
-    selectedModel (): string {
-      return this.settings.selectedModel || this.settings.systemModel || this.models[0]?.name || '';
-    },
+    activeChat: state => state.chats.find(chat => chat.id === state.activeChatId),
+    selectedModel: state => state.settings.selectedModel || state.settings.systemModel || state.models[0]?.name || '',
   },
   actions: {
     async checkOllamaConnection () {
@@ -54,35 +78,29 @@ export const useChatStore = defineStore('chat', {
 
     async fetchChats () {
       this.loading = true;
-      this.error = null;
       try {
         await waitForBackend();
         this.chats = await loadChats();
-      } catch (err: any) {
-        this.error = err?.message;
+      } catch (err) {
+        this.error = handleError(err, 'Failed to load chats');
       } finally {
         this.loading = false;
       }
     },
 
     async persistChat (chatId: string) {
-      try {
-        const chat = this.getChat(chatId);
-        if (chat) {
+      const chat = this.chats.find(c => c.id === chatId);
+      if (chat) {
+        try {
           await throttledSaveChat(chat);
+        } catch (error) {
+          this.error = handleError(error, 'Failed to persist chat');
         }
-      } catch (error) {
-        this.error = error instanceof Error ? error.message : 'Failed to persist chat';
-        console.error('Failed to persist chat:', error);
       }
     },
 
-    getChat (chatId: string): Chat | undefined {
-      return this.chats.find(c => c.id === chatId);
-    },
-
-    getMessage (chatId: string, messageId: string): Message | undefined {
-      return this.getChat(chatId)?.messages.find(m => m.id === messageId);
+    findById<T>(array: T[], id: string, key: keyof T = 'id' as keyof T): T | undefined {
+      return array.find(item => item[key] === id);
     },
 
     shouldGenerateTitle (chat: Chat): boolean {
@@ -100,25 +118,22 @@ export const useChatStore = defineStore('chat', {
         messages: [],
         timestamp: Date.now(),
       };
-
-      await this.persistChat(newChat.id);
       this.chats.unshift(newChat);
       this.activeChatId = newChat.id;
-
+      await this.persistChat(newChat.id);
       return newChat;
     },
 
     async deleteChat (chatId: string) {
       this.loading = true;
-      this.error = null;
       try {
         await deleteChat(chatId);
         await this.fetchChats();
         if (this.activeChatId === chatId) {
-          this.activeChatId = this.chats[0]?.id || (await this.createChat())?.id || '';
+          this.activeChatId = this.chats[0]?.id || (await this.createChat()).id;
         }
-      } catch (err: any) {
-        this.error = err.message;
+      } catch (err) {
+        this.error = handleError(err, 'Failed to delete chat');
       } finally {
         this.loading = false;
       }
@@ -126,14 +141,12 @@ export const useChatStore = defineStore('chat', {
 
     async clearChats () {
       this.loading = true;
-      this.error = null;
       try {
         await clearAllChats();
         this.chats = [];
         this.activeChatId = (await this.createChat()).id;
-      } catch (err: any) {
-        this.error = err.message;
-        console.error('Error clearing chats:', err);
+      } catch (err) {
+        this.error = handleError(err, 'Error clearing chats');
         throw err;
       } finally {
         this.loading = false;
@@ -141,84 +154,59 @@ export const useChatStore = defineStore('chat', {
     },
 
     async renameChat (chatId: string, newTitle: string) {
-      const chat = this.getChat(chatId);
+      const chat = this.findById(this.chats, chatId);
       if (chat) {
         chat.title = newTitle;
         await this.persistChat(chatId);
       }
     },
 
-    async addMessage (
-      chatId: string,
-      message: Omit<Message, 'id'>,
-      attachment?: { content: string; type: AttachmentType; timestamp: number; meta: File }
-    ): Promise<string | null> {
-      const chat = this.getChat(chatId);
+    async addMessage (chatId: string, message: Omit<Message, 'id'>, attachment?: { content: string; type: AttachmentType; timestamp: number; meta: File }) {
+      const chat = this.findById(this.chats, chatId);
+      if (!chat) return null;
 
-      if (chat) {
-        const newMessage: Message = {
-          ...message,
-          id: crypto.randomUUID(),
-          timestamp: message.timestamp ?? Date.now(),
-          ...(attachment && {
-            attachmentMeta: {
-              type: attachment.type === AttachmentType.TEXT ? AttachmentType.TEXT : AttachmentType.IMAGE,
-              name: attachment.meta.name,
-              size: attachment.meta.size,
-              lastModified: attachment.meta.lastModified,
-            },
-            attachmentContent: attachment.content,
-          }),
-        };
-
-        chat.messages.push(newMessage);
-        await this.persistChat(chatId);
-
-        return newMessage.id;
-      }
-
-      return null;
+      const newMessage: Message = {
+        ...message,
+        id: crypto.randomUUID(),
+        timestamp: message.timestamp ?? Date.now(),
+        ...(attachment && {
+          attachmentMeta: {
+            type: attachment.type === AttachmentType.TEXT ? AttachmentType.TEXT : AttachmentType.IMAGE,
+            name: attachment.meta.name,
+            size: attachment.meta.size,
+            lastModified: attachment.meta.lastModified,
+          },
+          attachmentContent: attachment.content,
+        }),
+      };
+      chat.messages.push(newMessage);
+      await this.persistChat(chatId);
+      return newMessage.id;
     },
 
     async updateMessage (chatId: string, messageId: string, content: string, isLoading?: boolean, thinkTime?: number, isThinking?: boolean) {
-      const message = this.getMessage(chatId, messageId);
+      const chat = this.findById(this.chats, chatId);
+      const message = chat?.messages.find(m => m.id === messageId);
       if (message) {
         message.content = content;
-        if (isLoading !== undefined) {
-          if (isLoading) {
-            message.isLoading = true;
-          } else {
-            delete message.isLoading;
-          }
-        }
-        if (thinkTime !== undefined) {
-          message.thinkTime = thinkTime;
-        }
-        if (isThinking !== undefined) {
-          message.isThinking = isThinking;
-        }
-
+        if (isLoading !== undefined) message.isLoading = isLoading;
+        if (thinkTime !== undefined) message.thinkTime = thinkTime;
+        if (isThinking !== undefined) message.isThinking = isThinking;
         await this.persistChat(chatId);
       }
     },
 
     async generateChatTitle (chatId: string) {
-      const chat = this.getChat(chatId);
+      const chat = this.findById(this.chats, chatId);
       if (!chat || chat.messages.length < 1) return;
 
-      const generateDefaultTitle = (content: string | undefined): string => {
-        if (!content) return this.settings.defaultChatTitle;
-        const words = content.split(' ').filter((_, i) => i <= 2);
-        return words.length > 0 ? words.join(' ') : this.settings.defaultChatTitle;
-      };
+      const generateDefaultTitle = (content?: string) =>
+        content?.split(' ').filter((_, i) => i <= 2).join(' ') || this.settings.defaultChatTitle;
 
       if (!this.settings.systemModel || chat.messages.length < 2) {
-        const newTitle = generateDefaultTitle(chat.messages[0]?.content);
-        await this.renameChat(chatId, newTitle);
+        await this.renameChat(chatId, generateDefaultTitle(chat.messages[0]?.content));
         return;
       }
-
-      const messages = chat.messages.slice(0, 2);
 
       try {
         const response = await this.http.request({
@@ -229,40 +217,22 @@ export const useChatStore = defineStore('chat', {
             model: this.settings.systemModel,
             messages: [
               { role: 'system', content: this.settings.titlePrompt },
-              ...messages.map(msg => ({ role: msg.role, content: msg.content })),
+              ...chat.messages.slice(0, 2).map(msg => ({ role: msg.role, content: msg.content })),
             ],
             stream: false,
-            format: {
-              type: 'object',
-              properties: { title: { type: 'string' } },
-              required: ['title'],
-            },
+            format: { type: 'object', properties: { title: { type: 'string' } }, required: ['title'] },
           },
         });
 
-        const content = response?.message?.content;
-        if (!content) throw new Error('No content in API response');
-
-        const parsed = JSON.parse(content);
-        const newTitle = parsed?.title;
-        if (typeof newTitle !== 'string' || !newTitle) {
-          throw new Error('Invalid title in API response');
-        }
-
+        const newTitle = JSON.parse(response?.message?.content || '{}')?.title;
+        if (typeof newTitle !== 'string' || !newTitle) throw new Error('Invalid title in API response');
         await this.renameChat(chatId, newTitle);
       } catch (error) {
-        console.error('Error generating chat title:', error);
-        const newTitle = generateDefaultTitle(chat.messages[0]?.content);
-        await this.renameChat(chatId, newTitle);
+        await this.renameChat(chatId, generateDefaultTitle(chat.messages[0]?.content));
       }
     },
 
-    async sendMessage (
-      chatId: string,
-      content: string,
-      attachmentContent?: Attachment | null = null,
-      memoryContent?: string | null = null,
-    ): Promise<void> {
+    async sendMessage (chatId: string, content: string, attachmentContent?: Attachment | null, memoryContent?: string | null) {
       try {
         const chat = this.activeChat;
         if (!chat) throw new Error('No active chat');
@@ -277,10 +247,7 @@ export const useChatStore = defineStore('chat', {
 
         if (attachmentContent && Object.keys(attachmentContent).length) {
           const file = attachmentContent.meta;
-          const metaInfo = `[Attached: ${file.name}, ${file.size} bytes, modified ${new Date(
-            file.lastModified
-          ).toLocaleDateString()}]`;
-
+          const metaInfo = `[Attached: ${file.name}, ${file.size} bytes, modified ${new Date(file.lastModified).toLocaleDateString()}]`;
           if (attachmentContent.type === AttachmentType.IMAGE) {
             images = [attachmentContent.content];
             finalContent = `<hidden>${metaInfo}</hidden>${finalContent}`;
@@ -288,27 +255,13 @@ export const useChatStore = defineStore('chat', {
             finalContent = `<hidden>\n${attachmentContent.content}\n${metaInfo}\n</hidden>${content}`;
           }
 
-          const mappedAttachment: Attachment | undefined = attachmentContent
-            ? {
-              ...attachmentContent,
-              type:
-              attachmentContent.type === AttachmentType.TEXT
-                ? AttachmentType.TEXT
-                : AttachmentType.IMAGE,
-            }
-            : undefined;
-
-          userMessageId = await this.addMessage(chatId, {
-            role: 'user',
-            content: finalContent,
-            timestamp: Date.now(),
-          }, mappedAttachment);
-        } else {
-          userMessageId = await this.addMessage(chatId, {
-            role: 'user',
-            content: finalContent,
+          userMessageId = await this.addMessage(chatId, { role: 'user', content: finalContent, timestamp: Date.now() }, {
+            ...attachmentContent,
+            type: attachmentContent.type === AttachmentType.TEXT ? AttachmentType.TEXT : AttachmentType.IMAGE,
             timestamp: Date.now(),
           });
+        } else {
+          userMessageId = await this.addMessage(chatId, { role: 'user', content: finalContent, timestamp: Date.now() });
         }
 
         if (!userMessageId) return;
@@ -323,178 +276,75 @@ export const useChatStore = defineStore('chat', {
           if (thinkTimeInterval) clearInterval(thinkTimeInterval);
           thinkTimeInterval = setInterval(async () => {
             if (isInThinkBlock && thinkStartTime && assistantMessageId) {
-              const currentThinkTime = Date.now() - thinkStartTime;
-              await this.updateMessage(chatId, assistantMessageId, assistantContent, true, currentThinkTime, true);
+              await this.updateMessage(chatId, assistantMessageId, assistantContent, true, Date.now() - thinkStartTime, true);
             }
           }, 100);
         };
 
         const cleanup = () => {
-          if (thinkTimeInterval) {
-            clearInterval(thinkTimeInterval);
-            thinkTimeInterval = null;
-          }
+          if (thinkTimeInterval) clearInterval(thinkTimeInterval);
           if (assistantMessageId && isInThinkBlock) {
-            isInThinkBlock = false;
-            const finalThinkTime = thinkStartTime ? Date.now() - thinkStartTime : undefined;
-            this.updateMessage(chatId, assistantMessageId, assistantContent, false, finalThinkTime, false);
+            this.updateMessage(chatId, assistantMessageId, assistantContent, false, thinkStartTime ? Date.now() - thinkStartTime : undefined, false);
           }
         };
 
         this.abortController.signal.addEventListener('abort', cleanup);
 
-        if (images) {
-          const body = {
+        const body = images
+          ? { model: this.selectedModel, prompt: finalContent, images, stream: true }
+          : {
             model: this.selectedModel,
-            prompt: finalContent,
-            images,
+            messages: [
+              { role: 'system', content: this.settings.systemPrompt || '' },
+              ...(memoryContent ? [{ role: 'system', content: memoryContent }] : []),
+              ...chat.messages.map(msg => ({
+                role: msg.role,
+                content: msg.content,
+                ...(msg.attachmentContent && msg.attachmentMeta?.type === AttachmentType.IMAGE ? { images: [msg.attachmentContent] } : {}),
+              })),
+            ],
             stream: true,
           };
 
-          const response = await fetch(`${this.settings.ollamaURL}/api/generate`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-            signal: this.abortController.signal,
+        const response = await fetch(`${this.settings.ollamaURL}/api/${images ? 'generate' : 'chat'}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          signal: this.abortController.signal,
+        });
+
+        await processStream(response, async data => {
+          const chunkContent = images ? data.response : data.message?.content;
+          if (!chunkContent) return;
+
+          if (chunkContent.includes('<think>') && !isInThinkBlock) {
+            thinkStartTime = Date.now();
+            isInThinkBlock = true;
+            startThinkTimeUpdates();
+          }
+
+          if (chunkContent.includes('</think>') && isInThinkBlock) {
+            isInThinkBlock = false;
+            if (thinkTimeInterval) clearInterval(thinkTimeInterval);
+            thinkTimeInterval = null;
+          }
+
+          assistantMessageId ??= await this.addMessage(chatId, {
+            role: 'assistant',
+            content: '',
+            isLoading: true,
+            thinkTime: thinkStartTime && isInThinkBlock ? Date.now() - thinkStartTime : undefined,
+            isThinking: isInThinkBlock,
+            timestamp: Date.now(),
           });
+          assistantContent += chunkContent;
+          await this.updateMessage(chatId, assistantMessageId!, assistantContent, true, thinkStartTime && isInThinkBlock ? Date.now() - thinkStartTime : undefined, isInThinkBlock);
+        }, this.abortController.signal);
 
-          if (!response.body) throw new Error('No response body');
-
-          const reader = response.body.getReader();
-          const decoder = new TextDecoder();
-
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split('\n').filter(line => line.trim());
-
-            for (const line of lines) {
-              try {
-                const data = JSON.parse(line);
-                if (data.response) {
-                  const chunkContent = data.response;
-
-                  if (chunkContent.includes('<think>') && !isInThinkBlock) {
-                    thinkStartTime = Date.now();
-                    isInThinkBlock = true;
-                    startThinkTimeUpdates();
-                  }
-
-                  if (chunkContent.includes('</think>') && isInThinkBlock) {
-                    isInThinkBlock = false;
-                    if (thinkTimeInterval) clearInterval(thinkTimeInterval);
-                    thinkTimeInterval = null;
-                  }
-
-                  assistantMessageId ??= await this.addMessage(chatId, {
-                    role: 'assistant',
-                    content: '',
-                    isLoading: true,
-                    thinkTime: thinkStartTime && isInThinkBlock ? Date.now() - thinkStartTime : undefined,
-                    isThinking: isInThinkBlock,
-                    timestamp: Date.now(),
-                  });
-                  assistantContent += chunkContent;
-                  await this.updateMessage(chatId, assistantMessageId!, assistantContent, true, thinkStartTime && isInThinkBlock ? Date.now() - thinkStartTime : undefined, isInThinkBlock);
-                }
-              } catch (e) {
-                console.error('Error parsing chunk:', e);
-              }
-            }
-          }
-
-          if (assistantMessageId) {
-            const message = this.getMessage(chatId, assistantMessageId);
-            if (message) {
-              const finalThinkTime = isInThinkBlock && thinkStartTime ? Date.now() - thinkStartTime : message.thinkTime;
-              if (thinkTimeInterval) clearInterval(thinkTimeInterval);
-              thinkTimeInterval = null;
-              await this.updateMessage(chatId, assistantMessageId, message.content, false, finalThinkTime, false);
-            }
-          }
-        } else {
-          const systemPrompt = this.settings.systemPrompt || '';
-
-          const messagesToSend = [
-            { role: 'system', content: systemPrompt },
-            ...(memoryContent ? [{ role: 'system', content: memoryContent }] : []),
-            ...chat.messages.map(msg => ({
-              role: msg.role,
-              content: msg.content,
-              ...(msg.attachmentContent && msg.attachmentMeta?.type === AttachmentType.IMAGE ? { images: [msg.attachmentContent] } : {}),
-            })),
-          ];
-
-          const body = {
-            model: this.selectedModel,
-            messages: messagesToSend,
-            stream: true,
-          };
-
-          const response = await fetch(`${this.settings.ollamaURL}/api/chat`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-            signal: this.abortController.signal,
-          });
-
-          if (!response.body) throw new Error('No response body');
-
-          const reader = response.body.getReader();
-          const decoder = new TextDecoder();
-
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split('\n').filter(line => line.trim());
-
-            for (const line of lines) {
-              try {
-                const data = JSON.parse(line);
-                if (data.message?.role === 'assistant' && data.message.content) {
-                  const chunkContent = data.message.content;
-
-                  if (chunkContent.includes('<think>') && !isInThinkBlock) {
-                    thinkStartTime = Date.now();
-                    isInThinkBlock = true;
-                    startThinkTimeUpdates();
-                  }
-
-                  if (chunkContent.includes('</think>') && isInThinkBlock) {
-                    isInThinkBlock = false;
-                    if (thinkTimeInterval) clearInterval(thinkTimeInterval);
-                    thinkTimeInterval = null;
-                  }
-
-                  assistantMessageId ??= await this.addMessage(chatId, {
-                    role: 'assistant',
-                    content: '',
-                    isLoading: true,
-                    thinkTime: thinkStartTime && isInThinkBlock ? Date.now() - thinkStartTime : undefined,
-                    isThinking: isInThinkBlock,
-                  });
-                  assistantContent += chunkContent;
-                  await this.updateMessage(chatId, assistantMessageId!, assistantContent, true, thinkStartTime && isInThinkBlock ? Date.now() - thinkStartTime : undefined, isInThinkBlock);
-                }
-              } catch (e) {
-                console.error('Error parsing chunk:', e);
-              }
-            }
-          }
-
-          if (assistantMessageId) {
-            const message = this.getMessage(chatId, assistantMessageId);
-            if (message) {
-              const finalThinkTime = isInThinkBlock && thinkStartTime ? Date.now() - thinkStartTime : message.thinkTime;
-              if (thinkTimeInterval) clearInterval(thinkTimeInterval);
-              thinkTimeInterval = null;
-              await this.updateMessage(chatId, assistantMessageId, message.content, false, finalThinkTime, false);
-            }
-          }
+        if (assistantMessageId) {
+          const finalThinkTime = isInThinkBlock && thinkStartTime ? Date.now() - thinkStartTime : this.findById(chat.messages, assistantMessageId)?.thinkTime;
+          if (thinkTimeInterval) clearInterval(thinkTimeInterval);
+          await this.updateMessage(chatId, assistantMessageId, assistantContent, false, finalThinkTime, false);
         }
 
         if (this.activeChat && this.shouldGenerateTitle(this.activeChat)) {
@@ -503,11 +353,8 @@ export const useChatStore = defineStore('chat', {
           this.isGeneratingTitle = false;
         }
       } catch (error: any) {
-        if (error.name === 'AbortError') {
-          console.log('Request aborted');
-        } else {
-          console.error('Failed to stream message from Ollama:', error);
-          this.error = error.message;
+        if (error.name !== 'AbortError') {
+          this.error = handleError(error, 'Failed to stream message from Ollama');
           throw error;
         }
       } finally {
@@ -515,30 +362,20 @@ export const useChatStore = defineStore('chat', {
       }
     },
 
-    async editMessage (
-      chatId: string,
-      messageId: string,
-      newContent: string,
-      dropFollowing: boolean = false,
-    ): Promise<void> {
-      const chat = this.getChat(chatId);
+    async editMessage (chatId: string, messageId: string, newContent: string, dropFollowing: boolean = false) {
+      const chat = this.findById(this.chats, chatId);
       if (!chat) return;
 
       const index = chat.messages.findIndex(m => m.id === messageId);
-
       if (index !== -1) {
         chat.messages[index].content = newContent;
-
-        if (dropFollowing) {
-          chat.messages = chat.messages.slice(0, index + 1);
-        }
-
+        if (dropFollowing) chat.messages = chat.messages.slice(0, index + 1);
         await this.persistChat(chatId);
       }
     },
 
     async deleteMessage (chatId: string, messageId: string) {
-      const chat = this.getChat(chatId);
+      const chat = this.findById(this.chats, chatId);
       if (!chat) return;
 
       const index = chat.messages.findIndex(m => m.id === messageId);
@@ -549,15 +386,13 @@ export const useChatStore = defineStore('chat', {
     },
 
     async regenerateMessage (chatId: string, messageId: string) {
-      const chat = this.getChat(chatId);
+      const chat = this.findById(this.chats, chatId);
       if (!chat) return;
 
       const index = chat.messages.findIndex(m => m.id === messageId);
-      if (index <= 0) return;
+      if (index <= 0 || chat.messages[index - 1].role !== 'user') return;
 
       const prevMessage = chat.messages[index - 1];
-      if (prevMessage.role !== 'user') return;
-
       chat.messages = chat.messages.slice(0, index - 1);
       await this.persistChat(chat.id);
 
@@ -577,9 +412,8 @@ export const useChatStore = defineStore('chat', {
         this.models = response.models || [];
         return this.models;
       } catch (error) {
-        console.error('Failed to fetch Ollama models:', error);
         this.models = [];
-        this.error = error instanceof Error ? error.message : 'Failed to fetch models';
+        this.error = handleError(error, 'Failed to fetch models');
         return [];
       }
     },

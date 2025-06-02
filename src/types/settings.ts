@@ -1,4 +1,5 @@
 export type Theme = 'light' | 'dark' | 'system';
+export type SearchFormat = 'html' | 'json';
 
 export const DEFAULT_SETTINGS = {
   isAsideOpen: false as boolean,
@@ -9,6 +10,7 @@ export const DEFAULT_SETTINGS = {
   memoryModel: '' as string,
   searchModel: '' as string,
   searxngURL: '' as string,
+  searchFormat: 'json' as SearchFormat,
   defaultChatTitle: 'New chat' as string,
   theme: 'dark' as Theme,
   isSearchAsDefault: false as boolean,
@@ -34,7 +36,8 @@ export const DEFAULT_SETTINGS = {
     "User works as a software developer.",
     "User prefers using Vue.js for frontend development."
   ]
-}` as string,
+}
+\`\`\`` as string,
 } as const;
 
 export type ISettings = typeof DEFAULT_SETTINGS;

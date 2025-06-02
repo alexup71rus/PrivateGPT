@@ -88,8 +88,10 @@
       <v-text-field
         v-model="formSettings.ollamaURL"
         class="mb-4"
+        hint="For example: http://localhost:11434"
         label="Ollama URL"
-        :rules="[v => !!v || 'URL is required', v => /^https?:\/\/[^\s/$.?#].[^\s]*$/.test(v) || 'Invalid URL format']"
+        persistent-hint
+        :rules="[v => !!v || 'URL is required', v => /^https?:\/\/[^\s/$.?#].[^\s]*$/.test(v) || 'Invalid URL format. Did you try http://localhost:11434?']"
         variant="solo-filled"
       >
         <template #append>
