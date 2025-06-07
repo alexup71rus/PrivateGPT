@@ -53,7 +53,6 @@ export const useMemoryStore = defineStore('memory', {
       this.error = null;
       try {
         const newEntry: MemoryEntry = {
-          id: Date.now(),
           content,
           createdAt: Date.now(),
         };
@@ -104,7 +103,7 @@ export const useMemoryStore = defineStore('memory', {
           headers: { 'Content-Type': 'application/json' },
           url: `${this.settings.ollamaURL}/api/chat`,
           data: {
-            model: this.settings.memoryModel || this.settings.systemModel || this.settings.selectedModel,
+            model: this.settings.memoryModel || this.settings.selectedModel,
             messages: [
               { role: 'system', content: this.settings.memoryPrompt },
               ...recentMessages,

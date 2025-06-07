@@ -1,5 +1,5 @@
 export interface MemoryEntry {
-  id: number;
+  id?: number;
   content: string;
   createdAt: number;
   updatedAt?: number;

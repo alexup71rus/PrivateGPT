@@ -173,6 +173,7 @@
           class="snackbar-button"
           :color="key.toLowerCase() === 'no' || key.toLowerCase() === 'cancel' ? 'secondary' : 'primary'"
           variant="text"
+
           @click="handleSnackbarAction(key)"
         >
           {{ key }}
@@ -193,6 +194,12 @@
   .snackbar-message {
     word-break: break-word;
     color: var(--v-theme-primary);
+  }
+
+  ::v-deep(.v-card-actions) {
+    padding: 0;
+    min-height: auto;
+    height: auto;
   }
 
   .snackbar-button {

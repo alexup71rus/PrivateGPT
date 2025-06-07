@@ -21,6 +21,7 @@
   const bubbleRef = ref();
   const isEditDialogOpen = ref(false);
   const editedContent = ref('');
+  const isSummaryLoading = ref(false);
 
   useCopyCode(bubbleRef, showSnackbar);
 
@@ -135,6 +136,7 @@
     if (!chatId) return;
 
     try {
+      isSummaryLoading.value = true;
       const activeChat = chat.chats.find(chat => chat.id === chatId) ?? null;
 
       if (!activeChat) {
@@ -188,6 +190,8 @@
       });
     } catch (error) {
       showSnackbar({ message: 'Error processing summary', type: 'error' });
+    } finally {
+      isSummaryLoading.value = false;
     }
   };
 </script>
@@ -224,7 +228,9 @@
     <v-btn icon="mdi-autorenew" size="small" variant="text" @click="regenerateMessage" />
     <v-btn icon="mdi-content-copy" size="small" variant="text" @click="copyToClipboard(message.content)" />
     <v-btn
+      :disabled="isSummaryLoading"
       icon="mdi-content-save"
+      :loading="isSummaryLoading"
       size="small"
       variant="text"
       @click="saveSummary"

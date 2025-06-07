@@ -16,7 +16,7 @@
   });
 
   const availableModels = computed(() => [
-    { name: 'General model', id: '' },
+    { name: 'Use selected model', id: '' },
     ...(chatStore.models || []),
   ]);
 

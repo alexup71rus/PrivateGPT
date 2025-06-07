@@ -200,7 +200,7 @@ export async function saveMemory (memory: MemoryEntry[]): Promise<MemoryEntry[]>
     `;
     const { saveMemoryEntries } = await client.request<{ saveMemoryEntries: MemoryEntry[] }>(mutation, {
       entries: memory.map(entry => ({
-        id: entry.id,
+        id: entry.id ?? undefined,
         content: entry.content,
         createdAt: entry.createdAt,
         updatedAt: entry.updatedAt,

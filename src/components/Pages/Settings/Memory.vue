@@ -21,7 +21,7 @@
   });
 
   const availableModels = computed(() => [
-    { name: 'General model', id: '' },
+    { name: 'Use selected model', id: '' },
     ...(chatStore.models || []),
   ]);
 
@@ -46,22 +46,31 @@
     }
     try {
       if (editingMemory.value?.id) {
+        console.log('Updating memory with ID:', editingMemory.value.id);
         await memoryStore.updateMemory(editingMemory.value.id, newMemoryContent.value);
         showSnackbar({ message: 'Memory updated', type: 'success' });
         editingMemory.value = null;
       } else {
+        console.log('Adding new memory');
         await memoryStore.addMemory(newMemoryContent.value);
         showSnackbar({ message: 'Memory added', type: 'success' });
       }
       newMemoryContent.value = '';
     } catch (error) {
+      console.error('Error in addOrUpdateMemory:', error);
       showSnackbar({ message: 'Failed to save memory', type: 'error' });
     }
   };
 
   const editMemory = (entry: MemoryEntry) => {
+    if (!entry.id) {
+      console.error('Invalid memory entry, missing ID:', entry);
+      showSnackbar({ message: 'Cannot edit memory: invalid ID', type: 'error' });
+      return;
+    }
     editingMemory.value = entry;
     newMemoryContent.value = entry.content;
+    console.log('Editing memory:', entry);
   };
 
   const deleteMemory = async (id: number) => {
@@ -78,7 +87,6 @@
     newMemoryContent.value = '';
   };
 
-  // Fetch memory on component mount
   memoryStore.fetchMemory();
 </script>
 
@@ -142,6 +150,7 @@
             color="primary"
             :disabled="!newMemoryContent.trim()"
             variant="flat"
+            @click="addOrUpdateMemory"
           >
             {{ editingMemory ? 'Update' : 'Add' }} Memory
           </v-btn>
@@ -169,7 +178,7 @@
     >
       <v-list-item
         v-for="entry in memoryStore.memory"
-        :key="entry.id"
+        :key="entry.id ?? 'temp-' + Math.random()"
         class="memory-item"
       >
         <div class="memory-content">
@@ -181,12 +190,14 @@
         <template #append>
           <v-btn
             color="primary"
+            :disabled="!entry.id"
             icon="mdi-pencil"
             variant="text"
             @click="editMemory(entry)"
           />
           <v-btn
             color="red"
+            :disabled="!entry.id"
             icon="mdi-delete"
             variant="text"
             @click="deleteMemory(entry.id)"
