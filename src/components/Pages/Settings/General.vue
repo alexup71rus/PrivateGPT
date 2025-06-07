@@ -18,7 +18,10 @@
     chatScrollMode: settingsStore.settings.chatScrollMode || 'scroll',
   });
 
-  const availableModels = computed(() => chatStore.models || []);
+  const availableModels = computed(() => [
+    { name: 'Use selected model', id: '' },
+    ...(chatStore.models || []).map(model => ({ name: model.name, id: model.id })),
+  ]);
   const connectionStatus = computed(() => chatStore.connectionStatus);
 
   const isFormValid = computed(() => {

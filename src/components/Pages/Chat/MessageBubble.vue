@@ -132,35 +132,62 @@
 
   const saveSummary = async () => {
     const chatId = chat.activeChatId;
-    if (chatId) {
-      try {
-        const activeChat = chat.chats.find(chat => chat.id === chatId) ?? null;
+    if (!chatId) return;
 
-        if (!activeChat) {
-          showSnackbar({ message: `Chat with ID ${chatId} not found`, type: 'warning' });
-          return;
-        }
+    try {
+      const activeChat = chat.chats.find(chat => chat.id === chatId) ?? null;
 
-        const messageIndex = activeChat.messages.findIndex(
-          message => message.id === props.message.id
-        );
-
-        if (messageIndex === -1) {
-          showSnackbar({ message: `Message with ID ${props.message.id} not found in chat`, type: 'warning' });
-          return;
-        }
-
-        const startIndex = Math.max(0, messageIndex - 3);
-        const recentMessages = activeChat.messages.slice(startIndex, messageIndex + 1);
-
-        const result = await memory.saveSummary(recentMessages);
-        showSnackbar({
-          message: result ? 'Memory updated: ' + result : 'Nothing to save',
-          type: result ? 'success' : 'warning',
-        });
-      } catch (error) {
-        showSnackbar({ message: 'Error saving summary', type: 'error' });
+      if (!activeChat) {
+        showSnackbar({ message: `Chat with ID ${chatId} not found`, type: 'warning' });
+        return;
       }
+
+      const messageIndex = activeChat.messages.findIndex(
+        message => message.id === props.message.id
+      );
+
+      if (messageIndex === -1) {
+        showSnackbar({ message: `Message with ID ${props.message.id} not found in chat`, type: 'warning' });
+        return;
+      }
+
+      const recentMessages = activeChat.messages
+        .filter(message => message.role === 'user')
+        .slice(-4);
+
+      const result = await memory.fetchSummary(recentMessages);
+
+      if (!result) {
+        showSnackbar({
+          message: 'Nothing to save',
+          type: 'warning',
+        });
+        return;
+      }
+
+      const confirmed = await new Promise<boolean>(resolve => {
+        showSnackbar({
+          message: `Do you want to save "${result}"?`,
+          type: 'info',
+          actions: {
+            Yes: () => resolve(true),
+            No: () => resolve(false),
+          },
+        });
+      });
+
+      if (!confirmed) {
+        showSnackbar({ message: 'Summary not saved', type: 'info' });
+        return;
+      }
+
+      await memory.saveSummary(result);
+      showSnackbar({
+        message: 'Memory updated',
+        type: 'success',
+      });
+    } catch (error) {
+      showSnackbar({ message: 'Error processing summary', type: 'error' });
     }
   };
 </script>

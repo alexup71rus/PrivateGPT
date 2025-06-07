@@ -3,7 +3,7 @@ import { useHttpService } from '@/plugins/httpPlugin';
 import { clearAllChats, deleteChat, loadChats, saveChat, searchBackend, waitForBackend } from '@/api/chats';
 import { type OllamaModel, type OllamaTagsResponse } from '@/types/ollama.ts';
 import { type Attachment, AttachmentType, type Chat, type Message } from '@/types/chats.ts';
-import { throttle } from '@/utils/helpers.ts';
+import { extractStringFromResponse, throttle } from '@/utils/helpers.ts';
 import { type ISettings } from '@/types/settings.ts';
 import { useSettingsStore } from '@/stores/settings.ts';
 import { useMemoryStore } from '@/stores/memory.ts';
@@ -181,6 +181,8 @@ export const useChatStore = defineStore('chat', {
         }),
       };
       chat.messages.push(newMessage);
+      chat.timestamp = Date.now();
+      this.chats.sort((a, b) => b.timestamp - a.timestamp);
       await this.persistChat(chatId);
       return newMessage.id;
     },
@@ -197,38 +199,55 @@ export const useChatStore = defineStore('chat', {
       }
     },
 
-    async generateChatTitle (chatId: string) {
+    async generateChatTitle (chatId: string): Promise<void> {
       const chat = this.findById(this.chats, chatId);
       if (!chat || chat.messages.length < 1) return;
 
-      const generateDefaultTitle = (content?: string) =>
-        content?.split(' ').filter((_, i) => i <= 2).join(' ') || this.settings.defaultChatTitle;
+      const generateDefaultTitle = (content?: string): string =>
+        content?.split(' ').slice(0, 5).join(' ') || this.settings.defaultChatTitle;
 
-      if (!this.settings.systemModel || chat.messages.length < 2) {
+      if (!this.settings.systemModel) {
         await this.renameChat(chatId, generateDefaultTitle(chat.messages[0]?.content));
         return;
       }
 
       try {
+        const userMessages = chat.messages
+          .filter(msg => msg.role === 'user')
+          .slice(-2);
+        const contextMessages = userMessages.length > 0 ? userMessages : chat.messages.slice(-1);
+
         const response = await this.http.request({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           url: `${this.settings.ollamaURL}/api/chat`,
           data: {
-            model: this.settings.systemModel,
+            model: this.settings.systemModel || this.settings.selectedModel,
             messages: [
               { role: 'system', content: this.settings.titlePrompt },
-              ...chat.messages.slice(0, 2).map(msg => ({ role: msg.role, content: msg.content })),
+              ...contextMessages,
+              { role: 'user', content: 'Generate the title.' },
             ],
             stream: false,
-            format: { type: 'object', properties: { title: { type: 'string' } }, required: ['title'] },
           },
         });
 
-        const newTitle = JSON.parse(response?.message?.content || '{}')?.title;
-        if (typeof newTitle !== 'string' || !newTitle) throw new Error('Invalid title in API response');
+        let newTitle = response?.message?.content?.trim();
+        if (!newTitle) {
+          console.warn('Empty title generated for messages:', contextMessages);
+          newTitle = generateDefaultTitle(userMessages[0]?.content || chat.messages[0]?.content);
+        } else {
+          newTitle = extractStringFromResponse(newTitle);
+          const textContent = newTitle.replace(/[\p{Emoji}]/gu, '');
+          if (newTitle.length > 50 || textContent.length < 3) {
+            console.warn('Invalid title generated:', newTitle, 'for messages:', contextMessages);
+            newTitle = generateDefaultTitle(userMessages[0]?.content || chat.messages[0]?.content);
+          }
+        }
+
         await this.renameChat(chatId, newTitle);
       } catch (error) {
+        console.warn('Failed to generate title:', error);
         await this.renameChat(chatId, generateDefaultTitle(chat.messages[0]?.content));
       }
     },
@@ -312,7 +331,7 @@ export const useChatStore = defineStore('chat', {
           : {
             model: this.selectedModel,
             messages: [
-              { role: 'system', content: this.settings.systemPrompt || '' },
+              ...(this.settings.systemPrompt ? [{ role: 'system', content: this.settings.systemPrompt || '' }] : []),
               ...(memoryContent ? [{ role: 'system', content: memoryContent }] : []),
               ...(searchResults ? [{ role: 'system', content: `Search results: ${searchResults}` }] : []),
               ...chat.messages.map(msg => ({
@@ -370,6 +389,9 @@ export const useChatStore = defineStore('chat', {
           await this.generateChatTitle(chatId);
           this.isGeneratingTitle = false;
         }
+
+        this.chats.sort((a, b) => b.timestamp - a.timestamp);
+        await this.persistChat(chatId);
       } catch (error: any) {
         if (error.name !== 'AbortError') {
           this.error = handleError(error, 'Failed to stream message from Ollama');

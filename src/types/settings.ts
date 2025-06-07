@@ -3,7 +3,6 @@ export type SearchFormat = 'html' | 'json';
 
 export const DEFAULT_SETTINGS = {
   isAsideOpen: false as boolean,
-  /* --- */
   ollamaURL: 'http://localhost:11434' as string,
   selectedModel: '' as string,
   defaultModel: '' as string,
@@ -15,29 +14,21 @@ export const DEFAULT_SETTINGS = {
   theme: 'dark' as Theme,
   isSearchAsDefault: false as boolean,
   chatScrollMode: 'scroll' as 'gap' | 'scroll',
-  systemPrompt: '',
-  systemModel: 'llama3.2:latest',
-  titlePrompt: 'You are an assistant that generates a concise chat title based on a user message and assistant response. Return a JSON object with a "title" field containing a short, descriptive title (max 50 characters) summarizing the conversation topic.' as string,
-  memoryPrompt: `You are an AI assistant tasked with summarizing key factual information about the user from a short conversation for long-term memory storage. The conversation includes messages where "user" is the human and "assistant" is the AI. Your goal is to extract concise, self-contained facts about the user, focusing on their preferences, background, or notable details explicitly mentioned.
-
-**Instructions:**
-1. Return a JSON object with a single field "facts", which is an array of strings.
-2. Each fact must be a short, standalone statement about the user (e.g., "User lives in New York.", "User prefers dark mode in apps.").
-3. Only include facts explicitly supported by the conversation. If no clear facts are present, infer one or two plausible, general facts based on the conversation's tone, style, or context (e.g., "User is interested in programming." if they discuss coding).
-4. Avoid speculative or overly vague facts (e.g., "User might like coffee.").
-5. Ensure the facts are useful for long-term memory, focusing on stable user traits or preferences.
-6. Return at least one fact, but limit to a maximum of three facts to keep the summary concise.
-
-**Example Output:**
-\`\`\`json
-{
-  "facts": [
-    "User has a dog named Max.",
-    "User works as a software developer.",
-    "User prefers using Vue.js for frontend development."
-  ]
-}
-\`\`\`` as string,
+  systemPrompt: 'You are a helpful assistant',
+  systemModel: '' as string,
+  titlePrompt: 'Generate a concise chat title (2-5 words, up to 50 characters) summarizing the topic based on the provided messages. Use the same language as the user’s message. Include a relevant emoji only if it enhances clarity. Return the title as plain text. Examples:\n' +
+  '- English: "🐍 Python Snake Game" for user: "Write a snake game in Python"\n' +
+  '- Russian: "🐱 Вибриссы у котов" for user: "Как называются усы у котов?"\n' +
+  '- French: "🇫🇷 Voyage à Paris" for user: "Plan a trip to Paris"\n' +
+  '- Spanish: "🍜 Receta de Ramen" for user: "Escribe una receta de ramen"' +
+  '- Spanish: "🍜 Receta de Ramen" for "Escribe una receta de ramen"' as string,
+  memoryPrompt: 'Summarize one key piece of information (up to 50 characters) from the provided chat messages, capturing the user\'s preferences, background, interests, or discussion context. Use the same language as the user\'s messages. Focus on a concise, memorable detail or theme. Examples:\n' +
+  '- English: "User explores TypeScript benefits." for a TypeScript chat\n' +
+  '- Russian: "Пользователь интересуется вибриссами." for "Как называются усы у котов?"\n' +
+  '- Spanish: "Usuario aprende frameworks JS." for a JS frameworks chat\n' +
+  '- French: "Utilisateur passionné de voyage." for a travel chat' as string,
 } as const;
 
-export type ISettings = typeof DEFAULT_SETTINGS;
+export type ISettings = {
+  [K in keyof typeof DEFAULT_SETTINGS]: typeof DEFAULT_SETTINGS[K];
+};

@@ -1,22 +1,24 @@
 <script lang="ts" setup>
   import { computed, nextTick, onMounted, ref, watch } from 'vue';
-  import { useChatStore } from '@/stores/chat.ts';
-  import { type Attachment, type AttachmentMeta, AttachmentType, type ChatModel } from '@/types/chats.ts';
-  import { useSettingsStore } from '@/stores/settings.ts';
-  import { useMemoryStore } from '@/stores/memory.ts';
+  import { useChatStore } from '@/stores/chat';
+  import { type Attachment, type ChatModel } from '@/types/chats';
+  import { useSettingsStore } from '@/stores/settings';
+  import { useMemoryStore } from '@/stores/memory';
+  import { type AttachmentContent, processFile } from '@/utils/fileProcessor';
 
   const chat = useChatStore();
   const { settings, updateSettings } = useSettingsStore();
   const memory = useMemoryStore();
+
   const textareaRef = ref<HTMLTextAreaElement>();
   const fileInputRef = ref<HTMLInputElement>();
-  const activeChat = computed(() => chat.activeChat);
-  const activeChatId = computed(() => chat.activeChatId);
   const messageText = ref('');
   const attachment = ref<File | null>(null);
-  const attachmentContent = ref<{ content: string, type: AttachmentType, meta: AttachmentMeta } | null>(null);
-  const canSend = computed(() => !chat.isSending && !!messageText.value.trim());
+  const attachmentContent = ref<AttachmentContent | null>(null);
 
+  const activeChat = computed(() => chat.activeChat);
+  const activeChatId = computed(() => chat.activeChatId);
+  const canSend = computed(() => !chat.isSending && !!messageText.value.trim());
   const modelNames = computed(() => chat.models?.map((model: ChatModel) => model.name) || []);
   const selectedModel = ref(settings.selectedModel || settings.defaultModel || settings.systemModel);
   const isChangedModel = computed(() => selectedModel.value !== (settings.defaultModel || settings.systemModel));
@@ -29,105 +31,80 @@
 
   const setDefaultModel = () => selectedModel.value && updateSettings({ defaultModel: selectedModel.value });
 
-  function selectModel (model: string) {
+  const selectModel = (model: string) => {
     selectedModel.value = model;
     updateSettings({ selectedModel: model });
-  }
+  };
 
-  function handleAttachClick () {
-    fileInputRef.value?.click();
-  }
+  const handleAttachClick = () => fileInputRef.value?.click();
 
-  function processFile (file: File, isImage: boolean) {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      if (isImage) {
-        const img = new Image();
-        img.src = result;
-        img.onload = () => {
-          let width = img.width;
-          let height = img.height;
-          const maxWidth = 1024;
-          const maxHeight = 768;
-          if (width > maxWidth || height > maxHeight) {
-            const ratio = Math.min(maxWidth / width, maxHeight / height);
-            width = Math.round(width * ratio);
-            height = Math.round(height * ratio);
-          }
-          const canvas = document.createElement('canvas');
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d')!;
-          ctx.drawImage(img, 0, 0, width, height);
-          const base64 = canvas.toDataURL('image/jpeg', 0.8);
-          const compressedBase64 = base64.split(',')[1];
-          attachmentContent.value = {
-            content: compressedBase64,
-            type: AttachmentType.IMAGE,
-            meta: { name: file.name, size: file.size, type: AttachmentType.IMAGE, lastModified: file.lastModified },
-          };
-        };
-      } else {
-        attachmentContent.value = {
-          content: result,
-          type: AttachmentType.TEXT,
-          meta: { name: file.name, size: file.size, type: AttachmentType.TEXT, lastModified: file.lastModified },
-        };
-      }
-      attachment.value = file;
-    };
-    if (isImage) reader.readAsDataURL(file);
-    else reader.readAsText(file);
-  }
-
-  function handleFilesSelected (event: Event) {
-    const file = (event.target as HTMLInputElement).files?.[0];
+  const handleFilesSelected = async (event: Event) => {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
     if (!file) return;
-    const isImage = /\.(png|jpe?g)$/i.test(file.name);
-    processFile(file, isImage);
-    (event.target as HTMLInputElement).value = '';
-  }
 
-  function removeAttachment () {
+    const result = await processFile(file);
+    if (result) {
+      attachmentContent.value = result;
+      attachment.value = file;
+    } else {
+      input.value = '';
+    }
+  };
+
+  const removeAttachment = () => {
     attachment.value = null;
     attachmentContent.value = null;
+    if (fileInputRef.value) fileInputRef.value.value = '';
     nextTick(() => textareaRef.value?.focus());
-  }
+  };
 
-  function onFormSubmit (event: Event) {
+  const onFormSubmit = (event: Event) => {
     event.preventDefault();
     sendMessage();
-  }
+  };
 
-  async function withSending (action: () => Promise<void>) {
+  const withSending = async (action: () => Promise<void>) => {
     chat.setIsSending(true);
     try {
       await action();
     } finally {
       chat.setIsSending(false);
     }
-  }
+  };
 
-  async function sendMessage () {
+  const sendMessage = async () => {
     if (!canSend.value) return;
     await withSending(async () => {
-      await chat.sendMessage(activeChatId.value, messageText.value, { ...attachmentContent.value } as Attachment, memory.getMemoryContent);
+      await chat.sendMessage(
+        activeChatId.value,
+        messageText.value,
+        { ...attachmentContent.value } as Attachment,
+        memory.getMemoryContent
+      );
       messageText.value = '';
       attachment.value = null;
       attachmentContent.value = null;
+      if (fileInputRef.value) fileInputRef.value.value = ''; // Очищаем инпут после отправки
     });
-  }
+  };
 
-  async function stopGeneration () {
+  const stopGeneration = async () => {
     if (!chat.abortController) return;
     chat.abortController.abort();
     chat.setIsSending(false);
     const lastMessage = activeChat.value?.messages[activeChat.value.messages.length - 1];
     if (lastMessage?.isLoading) {
-      await chat.updateMessage(activeChatId.value, lastMessage.id, lastMessage.content, false, lastMessage.thinkTime, false);
+      await chat.updateMessage(
+        activeChatId.value,
+        lastMessage.id,
+        lastMessage.content,
+        false,
+        lastMessage.thinkTime,
+        false
+      );
     }
-  }
+  };
 
   onMounted(() => nextTick(() => textareaRef.value?.focus()));
 

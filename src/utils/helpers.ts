@@ -1,9 +1,9 @@
-export function throttle<T extends (...args: any[]) => void>(fn: T, wait: number): T {
+export function throttle<T extends (...args: any[]) => void> (fn: T, wait: number): T {
   let lastCall = 0;
   let timeout: ReturnType<typeof setTimeout> | null = null;
   let lastArgs: any[] | null = null;
 
-  return function(this: any, ...args: any[]) {
+  return function (this: any, ...args: any[]) {
     const now = Date.now();
     const remaining = wait - (now - lastCall);
 
@@ -30,12 +30,25 @@ export function throttle<T extends (...args: any[]) => void>(fn: T, wait: number
   } as T;
 }
 
-export function debounce<T extends (...args: any[]) => void>(fn: T, wait: number): T {
+export function debounce<T extends (...args: any[]) => void> (fn: T, wait: number): T {
   let timeout: ReturnType<typeof setTimeout> | null = null;
 
-  return function(this: any, ...args: any[]) {
+  return function (this: any, ...args: any[]) {
     if (timeout) clearTimeout(timeout);
     timeout = setTimeout(() => fn.apply(this, args), wait);
   } as T;
 }
 
+export const extractStringFromResponse = (responseContent: string): string => {
+  try {
+    const parsed = JSON.parse(responseContent);
+    if (typeof parsed === 'string') return parsed.trim();
+    if (typeof parsed === 'object' && parsed !== null) {
+      const firstValue = Object.values(parsed)[0];
+      if (typeof firstValue === 'string') return firstValue.trim();
+    }
+  } catch {
+    // Not JSON or invalid JSON
+  }
+  return responseContent.trim();
+};

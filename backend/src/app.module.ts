@@ -9,6 +9,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AppResolver } from './app.resolver';
 import { SearchModule } from './search/search.module';
+import { MemoryModule } from './memory/memory.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { SearchModule } from './search/search.module';
 
     ChatsModule,
     SearchModule,
+    MemoryModule,
   ],
   controllers: [AppController],
   providers: [AppService, AppResolver],

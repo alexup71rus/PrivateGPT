@@ -12,6 +12,7 @@ declare module 'vue' {
     AlertProvider: typeof import('./components/Providers/AlertProvider.vue')['default']
     AttachmentChip: typeof import('./components/Pages/Chat/AttachmentChip.vue')['default']
     AttachmentPreview: typeof import('./components/Dialogs/AttachmentPreview.vue')['default']
+    ChatInput: typeof import('./components/Pages/Chat/ChatInput.vue')['default']
     General: typeof import('./components/Pages/Settings/General.vue')['default']
     ManageModels: typeof import('./components/Pages/Settings/ManageModels.vue')['default']
     Memory: typeof import('./components/Pages/Settings/Memory.vue')['default']
