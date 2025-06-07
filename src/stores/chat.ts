@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import { useHttpService } from '@/plugins/httpPlugin';
 import { clearAllChats, deleteChat, loadChats, saveChat, searchBackend, waitForBackend } from '@/api/chats';
 import { type OllamaModel, type OllamaTagsResponse } from '@/types/ollama.ts';
-import { type Attachment, type AttachmentType, type Chat, type Message } from '@/types/chats.ts';
+import { type Attachment, AttachmentType, type Chat, type Message } from '@/types/chats.ts';
 import { throttle } from '@/utils/helpers.ts';
 import { type ISettings } from '@/types/settings.ts';
 import { useSettingsStore } from '@/stores/settings.ts';
@@ -251,7 +251,7 @@ export const useChatStore = defineStore('chat', {
           try {
             searchResults = await searchBackend(content, this.settings.searxngURL, this.settings.searchFormat);
             if (searchResults) {
-              finalContent = `<search_results>${searchResults}</search_results>${content}`;
+              finalContent = `<hidden>${searchResults}</hidden>${content}`;
             }
           } catch (error) {
             console.error('Search failed:', error);

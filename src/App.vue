@@ -1,7 +1,7 @@
 <script lang="ts" setup>
   import AlertProvider from '@/components/Providers/AlertProvider.vue';
   import { useChatStore } from '@/stores/chat.ts';
-  import { onMounted, watch } from 'vue';
+  import { onMounted } from 'vue';
   import { useAppRouting } from '@/composables/useAppRouting.ts';
   import { useAppStore } from '@/stores/app.ts';
   import { useChatActions } from '@/composables/useChatActions.ts';
@@ -25,43 +25,24 @@
     await waitForBackend();
     await Promise.all([chat.fetchModels(), chat.fetchChats(), memory.fetchMemory()]);
 
-    if (chat.error || !chat.chats?.length || window.location.pathname !== '/') {
+    if (chat.error || window.location.pathname !== '/') {
       return;
     }
 
     const chatIdFromHash = window.location.hash.replace('#', '');
     const chats = chat.chats;
 
-    if (!chats.length) {
-      const newChatId = (await chat.createChat())?.id;
-      if (newChatId) await selectChat(newChatId);
-      return;
-    }
-
-    if (!chatIdFromHash) {
-      await selectChat(chats[0].id);
-      return;
-    }
-
-    const selectedChat = chats.find(chat => chat.id === chatIdFromHash);
-    if (selectedChat) {
-      await selectChat(chatIdFromHash);
-    } else if (chats[chats.length - 1].messages.length === 0) {
-      await selectChat(chats[chats.length - 1].id);
-    } else {
-      const newChatId = (await chat.createChat())?.id;
-      if (newChatId) await selectChat(newChatId);
-    }
-  });
-
-  watch(
-    () => route.hash,
-    async newHash => {
-      if (newHash) {
-        await selectChat(newHash.replace('#', ''));
+    if (chatIdFromHash) {
+      const selectedChat = chats.find(chat => chat.id === chatIdFromHash);
+      if (selectedChat) {
+        await selectChat(chatIdFromHash);
+        return;
       }
     }
-  );
+
+    const newChat = await chat.createChat();
+    await selectChat(newChat.id);
+  });
 
   const minimizeWindow = () => {
     (window as any).electronAPI.minimizeWindow();

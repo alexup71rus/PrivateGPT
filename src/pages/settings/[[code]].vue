@@ -1,7 +1,6 @@
 <script lang="ts" setup>
-  import { computed } from 'vue';
+  import { computed, defineAsyncComponent } from 'vue';
   import { useRoute } from 'vue-router';
-  import { defineAsyncComponent } from 'vue';
 
   const route = useRoute();
 
@@ -40,6 +39,10 @@
   width: 100%;
   max-height: calc(100vh - 32px);
   overflow: auto;
+}
+
+::v-global(.electron .settings-card) {
+  max-height: calc(100vh - 70px);
 }
 
 ::v-deep(.v-card-title) {
