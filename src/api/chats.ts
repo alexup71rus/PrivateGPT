@@ -61,6 +61,7 @@ export async function loadChats (): Promise<Chat[]> {
   }
 }
 
+// Unused. Why?
 export async function saveChats (chats: Chat[]): Promise<void> {
   try {
     const client = await getGraphQLClient();
@@ -171,7 +172,8 @@ export async function loadMemory (): Promise<MemoryEntry[]> {
         getMemory {
           id
           content
-          timestamp
+          createdAt
+          updatedAt
         }
       }
     `;
@@ -183,19 +185,48 @@ export async function loadMemory (): Promise<MemoryEntry[]> {
   }
 }
 
-export async function saveMemory (memory: MemoryEntry[]): Promise<void> {
+export async function saveMemory (memory: MemoryEntry[]): Promise<MemoryEntry[]> {
   try {
     const client = await getGraphQLClient();
     const mutation = gql`
-      mutation($entries: [MemoryEntryInput!]!) {
+      mutation SaveMemoryEntries($entries: [MemoryEntryInput!]!) {
         saveMemoryEntries(entries: $entries) {
           id
+          content
+          createdAt
+          updatedAt
         }
       }
     `;
-    await client.request(mutation, { entries: memory });
+    const { saveMemoryEntries } = await client.request<{ saveMemoryEntries: MemoryEntry[] }>(mutation, {
+      entries: memory.map(entry => ({
+        id: entry.id,
+        content: entry.content,
+        createdAt: entry.createdAt,
+        updatedAt: entry.updatedAt,
+      })),
+    });
+    return saveMemoryEntries || [];
   } catch (error) {
     handleGraphQLError(error);
+    throw error;
+  }
+}
+
+export async function deleteMemoryEntry (id: number): Promise<void> {
+  try {
+    const client = await getGraphQLClient();
+    const mutation = gql`
+      mutation DeleteMemoryEntry($id: Int!) {
+        deleteMemoryEntry(id: $id)
+      }
+    `;
+    await client.request(mutation, { id }, {
+      fetchPolicy: 'no-cache',
+    });
+  } catch (error) {
+    handleGraphQLError(error);
+    throw error;
   }
 }
 

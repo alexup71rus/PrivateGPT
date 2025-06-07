@@ -40,6 +40,12 @@
       }
     }
 
+    const latestChat = chats[0];
+    if (latestChat && latestChat.title === settingsStore.settings.defaultChatTitle && latestChat.messages.length === 0) {
+      await selectChat(latestChat.id);
+      return;
+    }
+
     const newChat = await chat.createChat();
     await selectChat(newChat.id);
   });

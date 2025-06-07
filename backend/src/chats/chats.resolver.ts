@@ -1,19 +1,18 @@
 import {
-  Resolver,
-  Query,
-  Mutation,
   Args,
-  InputType,
-  ObjectType,
   Field,
-  Int,
   Float,
+  InputType,
+  Int,
+  Mutation,
+  ObjectType,
+  Query,
   registerEnumType,
+  Resolver,
 } from '@nestjs/graphql';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ChatEntity } from './chat.entity';
-import { MemoryEntity } from './memory.entity';
 import { MessageEntity } from './message.entity';
 
 enum AttachmentType {
@@ -73,18 +72,6 @@ class Chat {
   messages: Message[];
 }
 
-@ObjectType()
-class MemoryEntry {
-  @Field(() => Int, { nullable: true })
-  id?: number;
-
-  @Field()
-  content: string;
-
-  @Field(() => Float)
-  timestamp: number;
-}
-
 @InputType()
 class AttachmentMetaInput {
   @Field(() => AttachmentType)
@@ -136,25 +123,11 @@ class ChatInput {
   messages: MessageInput[];
 }
 
-@InputType()
-class MemoryEntryInput {
-  @Field(() => Int, { nullable: true })
-  id?: number;
-
-  @Field()
-  content: string;
-
-  @Field(() => Float)
-  timestamp: number;
-}
-
 @Resolver(() => Chat)
 export class ChatsResolver {
   constructor(
     @InjectRepository(ChatEntity)
     private chatRepository: Repository<ChatEntity>,
-    @InjectRepository(MemoryEntity)
-    private memoryRepository: Repository<MemoryEntity>,
   ) {}
 
   private mapMessageEntityToMessage = (entity: MessageEntity): Message => {
@@ -220,79 +193,5 @@ export class ChatsResolver {
     const chats = await this.chatRepository.find();
     await this.chatRepository.remove(chats);
     return true;
-  }
-
-  // Memory Queries and Mutations
-  @Query(() => [MemoryEntry])
-  async getMemory(): Promise<MemoryEntry[]> {
-    return this.memoryRepository.find();
-  }
-
-  @Mutation(() => MemoryEntry)
-  async saveMemoryEntry(
-    @Args('entry') entry: MemoryEntryInput,
-  ): Promise<MemoryEntry> {
-    try {
-      const memoryEntity = this.memoryRepository.create(entry);
-      return await this.memoryRepository.save(memoryEntity);
-    } catch (error) {
-      throw new Error(`Failed to save memory entry: ${error}`);
-    }
-  }
-
-  @Mutation(() => [MemoryEntry])
-  async saveMemoryEntries(
-    @Args('entries', { type: () => [MemoryEntryInput] })
-    entries: MemoryEntryInput[],
-  ): Promise<MemoryEntry[]> {
-    try {
-      const memoryEntities = this.memoryRepository.create(entries);
-      return await this.memoryRepository.save(memoryEntities);
-    } catch (error) {
-      throw new Error(`Failed to save memory entries: ${error}`);
-    }
-  }
-
-  @Mutation(() => MemoryEntry)
-  async updateMemoryEntry(
-    @Args('entry') entry: MemoryEntryInput,
-  ): Promise<MemoryEntry> {
-    try {
-      if (!entry.id) {
-        throw new Error('MemoryEntry ID is required for update');
-      }
-      const existingEntry = await this.memoryRepository.findOne({
-        where: { id: entry.id },
-      });
-      if (!existingEntry) {
-        throw new Error(`MemoryEntry with ID ${entry.id} not found`);
-      }
-      const updatedEntry = this.memoryRepository.merge(existingEntry, entry);
-      return await this.memoryRepository.save(updatedEntry);
-    } catch (error) {
-      throw new Error(`Failed to update memory entry: ${error}`);
-    }
-  }
-
-  @Mutation(() => Boolean)
-  async deleteMemoryEntry(
-    @Args('id', { type: () => Int }) id: number,
-  ): Promise<boolean> {
-    try {
-      const result = await this.memoryRepository.delete(id);
-      return result.affected ? result.affected > 0 : false;
-    } catch (error) {
-      throw new Error(`Failed to delete memory entry: ${error}`);
-    }
-  }
-
-  @Mutation(() => Boolean)
-  async clearMemory(): Promise<boolean> {
-    try {
-      await this.memoryRepository.clear();
-      return true;
-    } catch (error) {
-      throw new Error(`Failed to clear memory: ${error}`);
-    }
   }
 }

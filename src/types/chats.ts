@@ -1,4 +1,9 @@
-export type MemoryEntry = { id?: number; content: string; timestamp: number };
+export interface MemoryEntry {
+  id: number;
+  content: string;
+  createdAt: number;
+  updatedAt?: number;
+}
 
 export enum AttachmentType {
   TEXT = 'TEXT',
@@ -21,7 +26,7 @@ export interface AttachmentMeta {
 export interface Message {
   id: string;
   content: string;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   timestamp: number;
   attachmentMeta?: AttachmentMeta | null;
   attachmentContent?: string | null;

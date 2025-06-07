@@ -45,8 +45,8 @@
       return;
     }
     try {
-      if (editingMemory.value) {
-        await memoryStore.updateMemory(editingMemory.value.timestamp, newMemoryContent.value);
+      if (editingMemory.value?.id) {
+        await memoryStore.updateMemory(editingMemory.value.id, newMemoryContent.value);
         showSnackbar({ message: 'Memory updated', type: 'success' });
         editingMemory.value = null;
       } else {
@@ -64,9 +64,9 @@
     newMemoryContent.value = entry.content;
   };
 
-  const deleteMemory = async (timestamp: number) => {
+  const deleteMemory = async (id: number) => {
     try {
-      await memoryStore.deleteMemory(timestamp);
+      await memoryStore.deleteMemory(id);
       showSnackbar({ message: 'Memory deleted', type: 'success' });
     } catch (error) {
       showSnackbar({ message: 'Failed to delete memory', type: 'error' });
@@ -87,7 +87,6 @@
     Memory Management
   </v-card-title>
   <v-card-text>
-    <!-- Memory Settings -->
     <v-form class="settings-form" @submit.prevent="saveSettings">
       <v-select
         v-model="formSettings.memoryModel"
@@ -112,7 +111,6 @@
       <v-btn
         block
         color="blue"
-        type="submit"
         variant="flat"
         @click="saveSettings"
       >Save Settings</v-btn>
@@ -127,7 +125,6 @@
   </v-card-actions>
 
   <v-card-text>
-    <!-- Memory Chunks -->
     <v-divider class="my-4" />
     <h3 class="section-subtitle">Memory Chunks</h3>
     <v-form class="memory-form mb-4" @submit.prevent="addOrUpdateMemory">
@@ -144,7 +141,6 @@
             block
             color="primary"
             :disabled="!newMemoryContent.trim()"
-            type="submit"
             variant="flat"
           >
             {{ editingMemory ? 'Update' : 'Add' }} Memory
@@ -161,7 +157,6 @@
       </v-card-actions>
     </v-form>
 
-    <!-- Memory List -->
     <v-progress-linear
       v-if="memoryStore.loading"
       class="mb-4"
@@ -174,13 +169,13 @@
     >
       <v-list-item
         v-for="entry in memoryStore.memory"
-        :key="entry.timestamp"
+        :key="entry.id"
         class="memory-item"
       >
         <div class="memory-content">
           <div class="content-text">{{ entry.content }}</div>
           <div class="content-meta text-grey">
-            {{ new Date(entry.timestamp).toLocaleString() }}
+            {{ new Date(entry.createdAt).toLocaleString() }}
           </div>
         </div>
         <template #append>
@@ -194,7 +189,7 @@
             color="red"
             icon="mdi-delete"
             variant="text"
-            @click="deleteMemory(entry.timestamp)"
+            @click="deleteMemory(entry.id)"
           />
         </template>
       </v-list-item>
