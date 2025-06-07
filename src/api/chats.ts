@@ -230,20 +230,41 @@ export async function deleteMemoryEntry (id: number): Promise<void> {
   }
 }
 
-export async function searchBackend (query: string, url: string, format: string): Promise<string | null> {
+
+interface SearchResultItem {
+  title: string;
+  url: string;
+  description: string;
+  content?: string;
+}
+
+export async function searchBackend (
+  query: string,
+  url: string,
+  format: 'html' | 'json',
+  options?: { searchResultsLimit: number; followSearchLinks: boolean }
+): Promise<SearchResultItem[] | null> {
   try {
     const client = await getGraphQLClient();
     const gqlQuery = gql`
-      query Search($query: String!, $url: String!, $format: String!) {
-        search(query: $query, url: $url, format: $format) {
+      query Search($query: String!, $url: String!, $format: String!, $limit: Int, $followLinks: Boolean) {
+        search(query: $query, url: $url, format: $format, limit: $limit, followLinks: $followLinks) {
           results
         }
       }
     `;
-    const { search } = await client.request<{ search: { results: string } }>(gqlQuery, { query, url, format });
+    const encodedQuery = encodeURIComponent(query); // Encode query to prevent injection
+    const { search } = await client.request<{ search: { results: string } }>(gqlQuery, {
+      query: encodedQuery,
+      url,
+      format,
+      limit: options?.searchResultsLimit,
+      followLinks: options?.followSearchLinks,
+    });
 
-    return search.results || null;
+    return search.results ? JSON.parse(search.results) as SearchResultItem[] : null;
   } catch (error) {
+    console.error('searchBackend error:', error);
     handleGraphQLError(error);
     return null;
   }

@@ -7,6 +7,7 @@ import { extractStringFromResponse, throttle } from '@/utils/helpers.ts';
 import { type ISettings } from '@/types/settings.ts';
 import { useSettingsStore } from '@/stores/settings.ts';
 import { useMemoryStore } from '@/stores/memory.ts';
+import type { SearchResultItem } from '../../backend/src/search/search.service.ts';
 
 const throttledSaveChat = throttle(async (chat: Chat) => {
   await saveChat(chat);
@@ -206,7 +207,7 @@ export const useChatStore = defineStore('chat', {
       const generateDefaultTitle = (content?: string): string =>
         content?.split(' ').slice(0, 5).join(' ') || this.settings.defaultChatTitle;
 
-      if (!this.settings.systemModel) {
+      if (!this.settings.systemModel && !this.settings.selectedModel) {
         await this.renameChat(chatId, generateDefaultTitle(chat.messages[0]?.content));
         return;
       }
@@ -254,53 +255,84 @@ export const useChatStore = defineStore('chat', {
 
     async sendMessage (chatId: string, content: string, attachmentContent?: Attachment | null, memoryContent?: string | null) {
       try {
+        console.log('sendMessage input:', { content, attachmentContent });
         const chat = this.activeChat;
         if (!chat) throw new Error('No active chat');
         if (!this.models.length) throw new Error('No models available');
 
+        if (!content.trim() && !attachmentContent) {
+          console.warn('No content or attachment provided');
+          throw new Error('Message content or attachment is required');
+        }
+
         this.abortController?.abort();
         this.abortController = new AbortController();
 
-        let finalContent = content;
+        const finalContent = content.trim() || '';
         let images: string[] | undefined;
         let userMessageId: string | null;
-        let searchResults: string | null = null;
+        let searchResults: SearchResultItem[] | null = null;
 
         if (this.isSearchActive) {
           try {
-            searchResults = await searchBackend(content, this.settings.searxngURL, this.settings.searchFormat);
-            if (searchResults) {
-              finalContent = `<hidden>${searchResults}</hidden>${content}`;
-            }
+            const searchModel = this.settings.searchModel || this.settings.selectedModel || this.settings.systemModel;
+            if (!searchModel) throw new Error('No search model available');
+
+            const searchQueryResponse = await this.http.request({
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              url: `${this.settings.ollamaURL}/api/chat`,
+              data: {
+                model: searchModel,
+                messages: [
+                  { role: 'system', content: this.settings.searchPrompt },
+                  { role: 'user', content },
+                ],
+                stream: false,
+              },
+            });
+
+            const searchQuery = searchQueryResponse?.message?.content?.trim();
+            if (!searchQuery) throw new Error('Failed to generate search query');
+
+            searchResults = await searchBackend(
+              searchQuery,
+              this.settings.searxngURL,
+              this.settings.searchFormat,
+              {
+                searchResultsLimit: this.settings.searchResultsLimit,
+                followSearchLinks: this.settings.followSearchLinks,
+              }
+            );
           } catch (error) {
             console.error('Search failed:', error);
-            // Continue without search results if search fails
           }
         }
-
-        // console.log(searchResults);
-        // return;
 
         if (attachmentContent && Object.keys(attachmentContent).length) {
           const file = attachmentContent.meta;
           const metaInfo = `[Attached: ${file.name}, ${file.size} bytes, modified ${new Date(file.lastModified).toLocaleDateString()}]`;
-          if (attachmentContent.type === AttachmentType.IMAGE) {
-            images = [attachmentContent.content];
-            finalContent = `<hidden>${metaInfo}</hidden>${finalContent}`;
-          } else if (attachmentContent.type === AttachmentType.TEXT) {
-            finalContent = `<hidden>\n${attachmentContent.content}\n${metaInfo}\n</hidden>${finalContent}`;
-          }
-
           userMessageId = await this.addMessage(chatId, { role: 'user', content: finalContent, timestamp: Date.now() }, {
             ...attachmentContent,
             type: attachmentContent.type === AttachmentType.TEXT ? AttachmentType.TEXT : AttachmentType.IMAGE,
             timestamp: Date.now(),
+            content: attachmentContent.type === AttachmentType.TEXT
+              ? `${attachmentContent.content}\n${metaInfo}`
+              : attachmentContent.content,
           });
+          console.log('Message added with attachment:', { finalContent, userMessageId });
+          if (attachmentContent.type === AttachmentType.IMAGE) {
+            images = [attachmentContent.content];
+          }
         } else {
           userMessageId = await this.addMessage(chatId, { role: 'user', content: finalContent, timestamp: Date.now() });
+          console.log('Message added without attachment:', { finalContent, userMessageId });
         }
 
-        if (!userMessageId) return;
+        if (!userMessageId) {
+          console.error('Failed to add message');
+          return;
+        }
 
         let thinkStartTime: number | null = null;
         let isInThinkBlock = false;
@@ -333,12 +365,23 @@ export const useChatStore = defineStore('chat', {
             messages: [
               ...(this.settings.systemPrompt ? [{ role: 'system', content: this.settings.systemPrompt || '' }] : []),
               ...(memoryContent ? [{ role: 'system', content: memoryContent }] : []),
-              ...(searchResults ? [{ role: 'system', content: `Search results: ${searchResults}` }] : []),
-              ...chat.messages.map(msg => ({
-                role: msg.role,
-                content: msg.content,
-                ...(msg.attachmentContent && msg.attachmentMeta?.type === AttachmentType.IMAGE ? { images: [msg.attachmentContent] } : {}),
-              })),
+              ...(searchResults ? [{ role: 'system', content: JSON.stringify(searchResults) }] : []),
+              ...chat.messages.map(msg => {
+                const message = {
+                  role: msg.role,
+                  content: msg.content,
+                  ...(msg.attachmentContent && msg.attachmentMeta?.type === AttachmentType.IMAGE ? { images: [msg.attachmentContent] } : {}),
+                };
+
+                if (msg.attachmentContent && msg.attachmentMeta?.type === AttachmentType.TEXT) {
+                  const fileContent = msg.attachmentContent.split(`[Attached: ${msg.attachmentMeta.name}`)[0].trim();
+                  return {
+                    ...message,
+                    content: `${msg.content}\n\n[File content: ${msg.attachmentMeta.name}]\n${fileContent}`,
+                  };
+                }
+                return message;
+              }),
             ],
             stream: true,
           };
@@ -395,6 +438,7 @@ export const useChatStore = defineStore('chat', {
       } catch (error: any) {
         if (error.name !== 'AbortError') {
           this.error = handleError(error, 'Failed to stream message from Ollama');
+          console.error('sendMessage error:', error);
           throw error;
         }
       } finally {

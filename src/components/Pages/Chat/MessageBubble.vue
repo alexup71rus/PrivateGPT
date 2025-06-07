@@ -25,7 +25,10 @@
 
   useCopyCode(bubbleRef, showSnackbar);
 
-  const parsedContent = computed(() => parseMarkdown(props.message.content));
+  const parsedContent = computed(() => {
+    console.log(props.message);
+    return parseMarkdown(props.message.content)
+  });
 
   const copyCodeBlock = async (code: string) => {
     await navigator.clipboard.writeText(code);
@@ -179,7 +182,7 @@
       });
 
       if (!confirmed) {
-        showSnackbar({ message: 'Summary not saved', type: 'info' });
+        showSnackbar({ message: 'Summary not saved', type: 'warning' });
         return;
       }
 
@@ -282,6 +285,10 @@
     background-color: var(--assistant-message-bg, #F2F2F7);
     color: var(--assistant-message-text, black);
     border-bottom-left-radius: 4px;
+  }
+
+  ::v-deep(.v-chip) {
+    margin-bottom: 6px;
   }
 
   .content {

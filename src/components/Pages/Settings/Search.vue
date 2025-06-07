@@ -13,6 +13,9 @@
     searxngURL: settingsStore.settings.searxngURL || '',
     searchModel: settingsStore.settings.searchModel || '',
     searchFormat: settingsStore.settings.searchFormat || 'json',
+    searchPrompt: settingsStore.settings.searchPrompt || '',
+    searchResultsLimit: settingsStore.settings.searchResultsLimit || 3,
+    followSearchLinks: settingsStore.settings.followSearchLinks || false,
   });
 
   const availableModels = computed(() => [
@@ -29,7 +32,10 @@
     return (
       formSettings.value.searxngURL?.trim() !== '' &&
       /^https?:\/\/[^\s/$.?#].[^\s]*$/.test(formSettings.value.searxngURL || '') &&
-      ['html', 'json'].includes(formSettings.value.searchFormat || '')
+      ['html', 'json'].includes(formSettings.value.searchFormat || '') &&
+      formSettings.value.searchPrompt?.trim() !== '' &&
+      (formSettings.value.searchResultsLimit || 0) >= 1 &&
+      (formSettings.value.searchResultsLimit || 0) <= 10
     );
   });
 
@@ -38,6 +44,9 @@
       searxngURL: formSettings.value.searxngURL,
       searchModel: formSettings.value.searchModel,
       searchFormat: formSettings.value.searchFormat,
+      searchPrompt: formSettings.value.searchPrompt,
+      searchResultsLimit: formSettings.value.searchResultsLimit,
+      followSearchLinks: formSettings.value.followSearchLinks,
     });
     showSnackbar({ message: 'Search settings saved', type: 'success' });
   };
@@ -47,6 +56,9 @@
       searxngURL: '',
       searchModel: '',
       searchFormat: 'json',
+      searchPrompt: settingsStore.settings.searchPrompt,
+      searchResultsLimit: 3,
+      followSearchLinks: false,
     };
     settingsStore.resetSettings();
     showSnackbar({ message: 'Search settings reset', type: 'success' });
@@ -86,6 +98,33 @@
         :items="availableModels"
         label="Model for search query"
         variant="solo-filled"
+      />
+      <v-textarea
+        v-model="formSettings.searchPrompt"
+        class="mb-4"
+        :hint="'Prompt to formulate search queries'"
+        label="Search prompt"
+        persistent-hint
+        rows="4"
+        variant="solo-filled"
+      />
+      <v-text-field
+        v-model.number="formSettings.searchResultsLimit"
+        class="mb-4"
+        :hint="'Number of search results to retrieve (1-100)'"
+        label="Total search results"
+        persistent-hint
+        :rules="[v => (v >= 1 && v <= 100) || 'Must be between 1 and 100']"
+        type="number"
+        variant="solo-filled"
+      />
+      <v-checkbox
+        v-model="formSettings.followSearchLinks"
+        class="mb-4"
+        color="primary"
+        :hint="'Enable to automatically follow links for more details'"
+        label="Follow links in search results"
+        persistent-hint
       />
     </v-form>
   </v-card-text>
