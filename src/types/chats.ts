@@ -1,3 +1,5 @@
+import type { SystemPrompt } from '@/types/settings';
+
 export interface MemoryEntry {
   id?: number;
   content: string;
@@ -40,6 +42,7 @@ export interface Chat {
   title: string;
   messages: Message[];
   timestamp: number;
+  systemPrompt?: SystemPrompt | null;
 }
 
 export interface ChatModel {

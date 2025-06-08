@@ -4,7 +4,7 @@ import { clearAllChats, deleteChat, loadChats, saveChat, searchBackend, waitForB
 import { type OllamaModel, type OllamaTagsResponse } from '@/types/ollama.ts';
 import { type Attachment, AttachmentType, type Chat, type Message } from '@/types/chats.ts';
 import { extractStringFromResponse, throttle } from '@/utils/helpers.ts';
-import { type ISettings } from '@/types/settings.ts';
+import { type ISettings, type SystemPrompt } from '@/types/settings.ts';
 import { useSettingsStore } from '@/stores/settings.ts';
 import { useMemoryStore } from '@/stores/memory.ts';
 import type { SearchResultItem } from '../../backend/src/search/search.service.ts';
@@ -82,7 +82,10 @@ export const useChatStore = defineStore('chat', {
       this.loading = true;
       try {
         await waitForBackend();
-        this.chats = await loadChats();
+        this.chats = (await loadChats()).map(chat => ({
+          ...chat,
+          systemPrompt: chat.systemPrompt || null,
+        }));
       } catch (err) {
         this.error = handleError(err, 'Failed to load chats');
       } finally {
@@ -119,11 +122,20 @@ export const useChatStore = defineStore('chat', {
         title: this.settings.defaultChatTitle,
         messages: [],
         timestamp: Date.now(),
+        systemPrompt: this.settings.defaultSystemPrompt,
       };
       this.chats.unshift(newChat);
       this.activeChatId = newChat.id;
       await this.persistChat(newChat.id);
       return newChat;
+    },
+
+    async setSystemPrompt (chatId: string, systemPrompt: SystemPrompt | null) {
+      const chat = this.chats.find(c => c.id === chatId);
+      if (chat) {
+        chat.systemPrompt = systemPrompt;
+        await this.persistChat(chatId);
+      }
     },
 
     async deleteChat (chatId: string) {
@@ -363,7 +375,7 @@ export const useChatStore = defineStore('chat', {
           : {
             model: this.selectedModel,
             messages: [
-              ...(this.settings.systemPrompt ? [{ role: 'system', content: this.settings.systemPrompt || '' }] : []),
+              ...(chat.systemPrompt ? [{ role: 'system', content: chat.systemPrompt.content }] : []),
               ...(memoryContent ? [{ role: 'system', content: memoryContent }] : []),
               ...(searchResults ? [{ role: 'system', content: JSON.stringify(searchResults) }] : []),
               ...chat.messages.map(msg => {

@@ -6,6 +6,11 @@ export const useSettingsStore = defineStore('settings', {
   state: () => {
     const saved = localStorage.getItem('privateGPTSettings');
     const parsed = saved ? JSON.parse(saved) : {};
+
+    if (!parsed.systemPrompts || !Array.isArray(parsed.systemPrompts)) {
+      parsed.systemPrompts = DEFAULT_SETTINGS.systemPrompts;
+    }
+
     const settings: ISettings = reactive({ ...DEFAULT_SETTINGS, ...parsed });
 
     return {

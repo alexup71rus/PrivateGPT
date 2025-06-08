@@ -5,9 +5,10 @@
   import { useSettingsStore } from '@/stores/settings';
   import { useMemoryStore } from '@/stores/memory';
   import { type AttachmentContent, processFile } from '@/utils/fileProcessor';
+  import { type SystemPrompt } from '@/types/settings';
 
   const chat = useChatStore();
-  const { settings, updateSettings } = useSettingsStore();
+  const settingsStore = useSettingsStore();
   const memory = useMemoryStore();
 
   const textareaRef = ref<HTMLTextAreaElement>();
@@ -20,8 +21,8 @@
   const activeChatId = computed(() => chat.activeChatId);
   const canSend = computed(() => !chat.isSending && !!messageText.value.trim());
   const modelNames = computed(() => chat.models?.map((model: ChatModel) => model.name) || []);
-  const selectedModel = ref(settings.selectedModel || settings.defaultModel || settings.systemModel);
-  const isChangedModel = computed(() => selectedModel.value !== (settings.defaultModel || settings.systemModel));
+  const selectedModel = ref(settingsStore.settings.selectedModel || settingsStore.settings.defaultModel || settingsStore.settings.systemModel);
+  const isChangedModel = computed(() => selectedModel.value !== (settingsStore.settings.defaultModel || settingsStore.settings.systemModel));
   const modelSearch = ref('');
   const filteredModels = computed(() =>
     modelSearch.value
@@ -29,11 +30,36 @@
       : modelNames.value
   );
 
-  const setDefaultModel = () => selectedModel.value && updateSettings({ defaultModel: selectedModel.value });
+  const systemPrompts = computed(() => settingsStore.settings.systemPrompts);
+  const selectedPrompt = ref<SystemPrompt | null>(activeChat.value?.systemPrompt || settingsStore.settings.defaultSystemPrompt);
+  const isChatEmpty = computed(() => activeChat.value?.messages.length === 0);
+  const isDefaultPrompt = computed(() => (prompt: SystemPrompt | null) => {
+    if (!prompt && !settingsStore.settings.defaultSystemPrompt) return true;
+    return prompt && settingsStore.settings.defaultSystemPrompt?.title === prompt.title;
+  });
+
+  const setDefaultModel = () => selectedModel.value && settingsStore.updateSettings({ defaultModel: selectedModel.value });
 
   const selectModel = (model: string) => {
     selectedModel.value = model;
-    updateSettings({ selectedModel: model });
+    settingsStore.updateSettings({ selectedModel: model });
+  };
+
+  const setDefaultPrompt = (prompt: SystemPrompt | null) => {
+    settingsStore.updateSettings({ defaultSystemPrompt: prompt });
+  };
+
+  const selectPrompt = (prompt: SystemPrompt | null) => {
+    if (activeChatId.value) {
+      chat.setSystemPrompt(activeChatId.value, prompt);
+      selectedPrompt.value = prompt;
+    }
+  };
+
+  const truncateContent = (content: string) => {
+    if (!content) return '';
+    const firstLine = content.split('\n')[0];
+    return firstLine.length > 50 ? firstLine.slice(0, 50) + '...' : firstLine + (content.includes('\n') ? '...' : '');
   };
 
   const handleAttachClick = () => fileInputRef.value?.click();
@@ -85,7 +111,7 @@
       messageText.value = '';
       attachment.value = null;
       attachmentContent.value = null;
-      if (fileInputRef.value) fileInputRef.value.value = ''; // Очищаем инпут после отправки
+      if (fileInputRef.value) fileInputRef.value.value = '';
     });
   };
 
@@ -106,10 +132,19 @@
     }
   };
 
-  onMounted(() => nextTick(() => textareaRef.value?.focus()));
+  onMounted(() => {
+    nextTick(() => textareaRef.value?.focus());
+    if (isChatEmpty.value && !activeChat.value?.systemPrompt) {
+      selectedPrompt.value = settingsStore.settings.defaultSystemPrompt;
+    }
+  });
 
   watch(() => [chat.activeChatId, chat.isSending, chat.selectedModel], () => {
     nextTick(() => textareaRef.value?.focus());
+  }, { deep: true });
+
+  watch(() => activeChat.value?.systemPrompt, newPrompt => {
+    selectedPrompt.value = newPrompt || settingsStore.settings.defaultSystemPrompt;
   }, { deep: true });
 </script>
 
@@ -123,6 +158,43 @@
     >
 
     <div class="chat-input-container">
+      <div v-if="isChatEmpty" class="prompt-autocomplete-wrapper">
+        <div class="prompt-autocomplete-backdrop" />
+        <v-autocomplete
+          v-model="selectedPrompt"
+          class="prompt-autocomplete"
+          hide-details
+          item-title="title"
+          item-value="title"
+          :items="[...systemPrompts, { title: 'No default', content: '' }]"
+          label="Select system prompt"
+          :menu-props="{ maxHeight: 300 }"
+          return-object
+          variant="solo-filled"
+        >
+          <template #item="{ item, props }">
+            <v-list-item
+              v-bind="props"
+              class="prompt-item"
+              :subtitle="truncateContent(item.raw.content)"
+              :title="item.raw.title"
+              @click="selectPrompt(item.raw.title === 'No default' ? null : item.raw)"
+            >
+              <template #append>
+                <v-btn
+                  v-if="!isDefaultPrompt(item.raw.title === 'No default' ? null : item.raw)"
+                  color="primary"
+                  density="compact"
+                  icon="mdi-check-circle"
+                  variant="text"
+                  @click.stop="setDefaultPrompt(item.raw.title === 'No default' ? null : item.raw)"
+                />
+              </template>
+            </v-list-item>
+          </template>
+        </v-autocomplete>
+      </div>
+
       <v-textarea
         ref="textareaRef"
         v-model="messageText"
@@ -200,7 +272,7 @@
         :color="'red'"
         icon="mdi-backup-restore"
         variant="tonal"
-        @click="selectModel(settings.defaultModel || settings.systemModel)"
+        @click="selectModel(settingsStore.settings.defaultModel || settingsStore.settings.systemModel)"
       />
       <v-spacer />
       <v-btn
@@ -256,9 +328,11 @@
   flex-direction: column;
   gap: 8px;
   border-radius: 30px;
+  position: relative;
 }
 
 .chat-input-container {
+  position: relative;
   ::v-deep(.v-field) {
     --v-shadow-key-umbra-opacity: 0;
     border-radius: 20px;
@@ -268,6 +342,61 @@
 .chat-input {
   max-height: 200px;
   overflow: auto;
+}
+
+.prompt-autocomplete-wrapper {
+  position: absolute;
+  bottom: 150%;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 300px;
+  width: 100%;
+  z-index: 10;
+}
+
+.prompt-autocomplete-backdrop {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  right: -8px;
+  bottom: -8px;
+  background-color: rgb(var(--v-theme-surface));
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 30px;
+  z-index: -1;
+}
+
+.prompt-autocomplete {
+  ::v-deep(.v-field) {
+    background-color: rgb(var(--v-theme-surface));
+    border-radius: 20px;
+    --v-shadow-key-umbra-opacity: 0;
+  }
+  ::v-deep(.v-field__input) {
+    color: rgb(var(--v-theme-on-surface));
+  }
+  ::v-deep(.v-field-label) {
+    color: rgb(var(--v-theme-on-surface));
+    opacity: 0.6;
+  }
+}
+
+.prompt-item {
+  ::v-deep(.v-list-item-title) {
+    font-size: 1rem;
+    color: rgb(var(--v-theme-on-surface));
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  ::v-deep(.v-list-item-subtitle) {
+    font-size: 0.875rem;
+    color: rgb(var(--v-theme-on-surface));
+    opacity: 0.6;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }
 
 .chat-input-actions {
@@ -293,17 +422,17 @@
     font-weight: normal;
     letter-spacing: normal;
     border-radius: 9999px;
-    padding: 0 10px 0 10px;
+    padding: 0 10px;
   }
 
   .v-btn--icon.v-btn--density-default {
     width: var(--v-btn-height);
     height: var(--v-btn-height);
-    padding: 0 4px 0 4px;
+    padding: 0 4px;
   }
 
   ::v-deep(.v-btn__prepend) {
-    margin-inline: -4px 4px;
+    margin-inline: -4px 8px;
   }
 
   .file-btn.text-blue {

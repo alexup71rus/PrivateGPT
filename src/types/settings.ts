@@ -1,6 +1,11 @@
 export type Theme = 'light' | 'dark' | 'system';
 export type SearchFormat = 'html' | 'json';
 
+export type SystemPrompt = {
+  title: string;
+  content: string;
+};
+
 export const DEFAULT_SETTINGS = {
   isAsideOpen: false as boolean,
   ollamaURL: 'http://localhost:11434' as string,
@@ -14,7 +19,10 @@ export const DEFAULT_SETTINGS = {
   theme: 'dark' as Theme,
   isSearchAsDefault: false as boolean,
   chatScrollMode: 'scroll' as 'gap' | 'scroll',
-  systemPrompt: 'You are a helpful assistant',
+  systemPrompts: [
+    { title: 'Default Assistant', content: 'You are a helpful assistant' },
+  ] as SystemPrompt[],
+  defaultSystemPrompt: null as SystemPrompt | null,
   systemModel: '' as string,
   titlePrompt: 'Generate a concise chat title (2-5 words, up to 50 characters) summarizing the topic based on the provided messages. Use the same language as the user’s message. Include a relevant emoji only if it enhances clarity. Return the title as plain text. Examples:\n' +
     '- English: "🐍 Python Snake Game" for user: "Write a snake game in Python"\n' +

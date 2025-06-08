@@ -35,9 +35,22 @@
         v-model="chatTitle"
         :disabled="!chat.activeChat?.id || chat.isGeneratingTitle"
         hide-details="auto"
-        label="Заголовок чата"
+        label="Chat Title"
         variant="solo"
       />
+      <v-tooltip text="Link to project GitHub">
+        <template #activator="{ props }">
+          <v-btn
+            v-bind="props"
+            class="github-button"
+            color="grey-darken-1"
+            href="https://github.com/alexup71rus/PrivateGPT"
+            icon="mdi-github"
+            target="_blank"
+            variant="text"
+          />
+        </template>
+      </v-tooltip>
     </div>
 
     <div ref="chatMessagesRef" class="chat-messages" :style="{ paddingBottom: `${chatGap}px` }">
@@ -96,14 +109,25 @@
   padding: 7px 16px 16px;
 
   .chat-title {
+    display: flex;
+    justify-content: space-between;
     padding-bottom: 15px;
     width: 100%;
-    max-width: 400px;
     margin-left: 50px;
+    align-items: center;
+    gap: 8px;
     transition: .4s ease-in-out;
 
     &--opened {
       margin-left: 0;
+    }
+
+    .github-button {
+      flex-shrink: 0;
+    }
+
+    > .v-input {
+      max-width: 400px;
     }
   }
 
