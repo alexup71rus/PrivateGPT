@@ -12,12 +12,12 @@
 
 * 💬 Works with local LLMs via **Ollama**
 * 🧠 Persistent memory (summarization-based), like GPT
-* 🖼️ Image generation (in development)
-* 📁 Chat folders for organizing by project (in development)
-* 🔍 Internet search (in development)
-* 📄 Upload and analyze documents (RAG in development, supports only text)
+* 🖼️ Image generation _**(in development)**_
+* 📁 Chat folders for organizing by project _**(in development)**_
+* 🔍 Internet search
+* 📄 Upload and analyze documents (RAG in development, supports only text files)
 * 🖼️ Upload and view images
-* ⚡ Custom prompt snippets (in development)
+* ⚡ Quick system prompt snippets
 * ⚙️ Minimal, easily adaptable codebase
 
 ### ⚙️ Required Models
