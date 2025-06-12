@@ -10,7 +10,7 @@ export function buildOllamaRequestBody (
   attachmentContent: Attachment | null | undefined,
   memoryContent: string | null | undefined,
   searchResults: SearchResultItem[] | null,
-  linkContent: { url: string; content?: string; error?: string } | null,
+  linkContent: { urls: string[]; content?: string; error?: string } | null,
   textFileContent: { content: string; meta: { name: string; size: number } } | null,
 ) {
   const hasAttachment = !!(attachmentContent && Object.keys(attachmentContent).length);

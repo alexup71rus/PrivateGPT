@@ -257,19 +257,19 @@ interface LinkContent {
   error?: string;
 }
 
-export async function fetchLinkContent (url: string): Promise<LinkContent> {
+export async function fetchLinkContent (urls: string[]): Promise<LinkContent> {
   try {
     const client = await getGraphQLClient();
     const gqlQuery = gql`
-      query FetchLinkContent($url: String!) {
-        fetchLinkContent(url: $url) {
+      query FetchLinkContent($urls: [String!]!) {
+        fetchLinkContent(urls: $urls) {
           content
           error
         }
       }
     `;
-    const encodedUrl = encodeURIComponent(url);
-    const { fetchLinkContent } = await client.request<{ fetchLinkContent: LinkContent }>(gqlQuery, { url: encodedUrl });
+    const encodedUrls = urls.map(url => encodeURIComponent(url));
+    const { fetchLinkContent } = await client.request<{ fetchLinkContent: LinkContent }>(gqlQuery, { urls: encodedUrls });
     return fetchLinkContent;
   } catch (error) {
     console.error('fetchLinkContent error:', error);

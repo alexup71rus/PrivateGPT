@@ -16,7 +16,7 @@ import { type OllamaModel, type OllamaTagsResponse } from '@/types/ollama.ts';
 import { type Attachment, AttachmentType, type Chat, type Message } from '@/types/chats.ts';
 import {
   createThrottledFunction,
-  extractLink,
+  extractLinks,
   extractStringFromResponse,
   findById,
   handleError,
@@ -300,17 +300,18 @@ export const useChatStore = defineStore('chat', {
         const finalContent = content.trim() || '';
         let userMessageId: string | null;
         let searchResults: SearchResultItem[] | null = null;
-        let linkContent: { url: string; content?: string; error?: string } | null = null;
+        let linkContent: { urls: string[]; content?: string; error?: string } | null = null;
         let textFileContent: { content: string; meta: { name: string; size: number } } | null = null;
         const hasAttachment = !!(attachmentContent && Object.keys(attachmentContent).length);
 
-        const url = extractLink(finalContent);
-        if (url) {
+        const urls = extractLinks(finalContent);
+        if (urls?.length) {
           try {
-            const result = await fetchLinkContent(url);
-            linkContent = { url, content: result.content, error: result.error };
+            console.log(urls);
+            const result = await fetchLinkContent(urls);
+            linkContent = { urls, content: result.content, error: result.error };
           } catch (error) {
-            linkContent = { url, error: 'Failed to fetch link content' };
+            linkContent = { urls, error: 'Failed to fetch link content' };
           }
         } else if (this.isSearchActive) {
           try {

@@ -10,6 +10,8 @@ import { AppService } from './app.service';
 import { AppResolver } from './app.resolver';
 import { SearchModule } from './search/search.module';
 import { MemoryModule } from './memory/memory.module';
+import { LinkParserModule } from './link-parser/link-parser.module';
+import { WebUtilsModule } from './web-utils/web-utils.module';
 
 @Module({
   imports: [
@@ -28,8 +30,10 @@ import { MemoryModule } from './memory/memory.module';
     }),
 
     ChatsModule,
-    SearchModule,
     MemoryModule,
+    WebUtilsModule,
+    SearchModule,
+    LinkParserModule,
   ],
   controllers: [AppController],
   providers: [AppService, AppResolver],

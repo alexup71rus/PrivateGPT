@@ -277,6 +277,10 @@
     background-color: var(--user-message-bg, #007AFF);
     color: var(--user-message-text, white);
     border-bottom-right-radius: 4px;
+
+    ::v-deep(a) {
+      color: var(--user-message-text, #c0e2fd);
+    }
   }
 
   &.assistant {
@@ -284,6 +288,10 @@
     background-color: var(--assistant-message-bg, #F2F2F7);
     color: var(--assistant-message-text, black);
     border-bottom-left-radius: 4px;
+
+    ::v-deep(a) {
+      color: var(--user-message-text, #007AFF);
+    }
   }
 
   ::v-deep(.v-chip) {

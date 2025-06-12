@@ -90,7 +90,25 @@ export const findById = <T>(array: T[], id: string, key: keyof T = 'id' as keyof
   return array.find(item => item[key] === id);
 };
 
-export function extractLink (text: string): string | null {
-  const urlMatch = text.match(/(https?:\/\/|ftp:\/\/|www\.)[^\s/$.?#].[^\s]*/i);
-  return urlMatch ? urlMatch[0] : null;
+export function extractLinks (text: string): string[] | null {
+  const urlMatches = text.match(/(https?|ftp):\/\/[^\s/$.?#]+\.[^\s/$.?#]+[^\s]*/gi);
+  if (!urlMatches?.length) return null;
+
+  const validUrls: string[] = [];
+  for (const url of urlMatches) {
+    const trimmedUrl = url.trim();
+    if (!trimmedUrl || trimmedUrl === 'undefined') continue;
+
+    try {
+      new URL(trimmedUrl);
+      const decodedUrl = decodeURIComponent(trimmedUrl);
+      if (decodedUrl === 'undefined' || !decodedUrl) continue;
+      validUrls.push(decodedUrl);
+    } catch (e) {
+      console.warn(`Invalid URL skipped: ${trimmedUrl}`, e);
+      continue;
+    }
+  }
+
+  return validUrls.length ? validUrls : null;
 }

@@ -115,6 +115,32 @@
     gap: 8px;
     transition: .4s ease-in-out;
 
+    .v-input {
+      opacity: .8;
+      transition: ease-in-out 1s;
+      transition-delay: .5s;
+
+      ::v-deep(.v-field--variant-solo) {
+        box-shadow: none;
+        background-color: transparent;
+        transition: ease-in-out .3s;
+        transition-delay: .5s;
+      }
+
+      &:hover {
+        opacity: 1;
+        transition: ease-in-out .1s;
+        transition-delay: 0s;
+
+        ::v-deep(.v-field--variant-solo) {
+          box-shadow: 0px 3px 1px -2px var(--v-shadow-key-umbra-opacity, rgba(0, 0, 0, 0.2)), 0px 2px 2px 0px var(--v-shadow-key-penumbra-opacity, rgba(0, 0, 0, 0.14)), 0px 1px 5px 0px var(--v-shadow-key-ambient-opacity, rgba(0, 0, 0, 0.12));
+          background-color: rgb(var(--v-theme-surface));
+          transition: ease-in-out .1s;
+          transition-delay: 0s;
+        }
+      }
+    }
+
     &--opened {
       margin-left: 0;
     }

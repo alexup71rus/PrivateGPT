@@ -13,10 +13,9 @@
 * 💬 Works with local LLMs via **Ollama**
 * 🧠 Persistent memory (summarization-based), like GPT
 * 🖼️ Image generation _**(in development)**_
-* 📁 Chat folders for organizing by project _**(in development)**_
-* 🔍 Internet search
-* 📄 Upload and analyze documents (RAG in development, supports only text files)
-* 🖼️ Upload and view images
+* 🔍 Internet search and check provided links
+* 📄 Upload and analyze documents (RAG database in development, supports only text files)
+* 🖼️ Supports images
 * ⚡ Quick system prompt snippets
 * ⚙️ Minimal, easily adaptable codebase
 
@@ -59,6 +58,7 @@ First, install dependencies for both root and backend:
 ```bash
 pnpm install
 pnpm --prefix backend install
+pnpm --prefix backend exec node node_modules/puppeteer/install.js
 ```
 
 Then, to run the app in development mode:
