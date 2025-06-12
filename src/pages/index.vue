@@ -19,12 +19,9 @@
     chat.renameChat(chat.activeChatId, newTitle);
   });
 
-  watch(() => chat.activeChat?.title || '', (newTitle: string) => {
-    chatTitle.value = newTitle;
-  });
-
   watch(() => chat.activeChatId, (newId: string) => {
     updateActiveChatId(newId);
+    chatTitle.value = chat.activeChat?.title ?? '';
   });
 </script>
 

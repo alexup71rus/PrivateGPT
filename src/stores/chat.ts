@@ -14,52 +14,23 @@ import {
 } from '@/api/chats';
 import { type OllamaModel, type OllamaTagsResponse } from '@/types/ollama.ts';
 import { type Attachment, AttachmentType, type Chat, type Message } from '@/types/chats.ts';
-import { extractLink, extractStringFromResponse, throttle } from '@/utils/helpers.ts';
+import {
+  createThrottledFunction,
+  extractLink,
+  extractStringFromResponse,
+  findById,
+  handleError,
+  processStream,
+} from '@/utils/helpers.ts';
 import { type ISettings, type SystemPrompt } from '@/types/settings.ts';
 import { useSettingsStore } from '@/stores/settings.ts';
 import { useMemoryStore } from '@/stores/memory.ts';
 import type { SearchResultItem } from '../../backend/src/search/search.service.ts';
-import { formatFileSize } from '@/utils/chatUtils.ts';
+import { buildOllamaRequestBody } from '@/utils/messageUtils.ts';
 
-const throttledSaveChat = throttle(async (chat: Chat) => {
-  await saveChat(chat);
-}, 2000);
-
-const throttledSaveMessage = throttle(async (chatId: string, message: Message) => {
-  await saveMessage(chatId, message);
-}, 800);
-
-const throttledSaveChatMeta = throttle(async (meta: { id: string; title?: string; timestamp?: number; systemPrompt?: string | null }) => {
-  await saveChatMeta(meta);
-}, 800);
-
-const handleError = (error: unknown, defaultMessage: string): string => {
-  const message = error instanceof Error ? error.message : defaultMessage;
-  console.error(defaultMessage, error);
-  return message;
-};
-
-const processStream = async (
-  response: Response,
-  onChunk: (data: any) => Promise<void>
-) => {
-  if (!response.body) throw new Error('No response body');
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    const lines = decoder.decode(value, { stream: true }).split('\n').filter(line => line.trim());
-    for (const line of lines) {
-      try {
-        const data = JSON.parse(line);
-        await onChunk(data);
-      } catch (e) {
-        console.error('Error parsing chunk:', e);
-      }
-    }
-  }
-};
+const throttledSaveChat = createThrottledFunction(saveChat, 2000);
+const throttledSaveMessage = createThrottledFunction(saveMessage, 800);
+const throttledSaveChatMeta = createThrottledFunction(saveChatMeta, 800);
 
 export const useChatStore = defineStore('chat', {
   state: () => {
@@ -76,6 +47,7 @@ export const useChatStore = defineStore('chat', {
       models: [] as OllamaModel[],
       chats: [] as Chat[],
       activeChatId: '',
+      activeChat: null as Chat | null,
       isGeneratingTitle: false,
       isSearchActive: settings.isSearchAsDefault,
       isSending: false,
@@ -85,10 +57,13 @@ export const useChatStore = defineStore('chat', {
     };
   },
   getters: {
-    activeChat: state => state.chats.find(chat => chat.id === state.activeChatId),
     selectedModel: state => state.settings.selectedModel || state.settings.systemModel || state.models[0]?.name || '',
   },
   actions: {
+    syncActiveChat () {
+      this.activeChat = (this.chats.find(chat => chat.id === this.activeChatId) || null);
+    },
+
     async checkOllamaConnection () {
       this.error = null;
       await this.fetchModels();
@@ -106,6 +81,7 @@ export const useChatStore = defineStore('chat', {
           ...chat,
           systemPrompt: chat.systemPrompt || null,
         }));
+        this.syncActiveChat();
       } catch (err) {
         this.error = handleError(err, 'Failed to load chats');
       } finally {
@@ -140,10 +116,6 @@ export const useChatStore = defineStore('chat', {
       }
     },
 
-    findById<T>(array: T[], id: string, key: keyof T = 'id' as keyof T): T | undefined {
-      return array.find(item => item[key] === id);
-    },
-
     shouldGenerateTitle (chat: Chat): boolean {
       return !chat.title || chat.title === this.settings.defaultChatTitle;
     },
@@ -162,6 +134,7 @@ export const useChatStore = defineStore('chat', {
       };
       this.chats.unshift(newChat);
       this.activeChatId = newChat.id;
+      this.syncActiveChat();
       await this.persistChat(newChat.id);
       return newChat;
     },
@@ -181,6 +154,7 @@ export const useChatStore = defineStore('chat', {
         await this.fetchChats();
         if (this.activeChatId === chatId) {
           this.activeChatId = this.chats[0]?.id || (await this.createChat()).id;
+          this.syncActiveChat();
         }
       } catch (err) {
         this.error = handleError(err, 'Failed to delete chat');
@@ -195,6 +169,7 @@ export const useChatStore = defineStore('chat', {
         await clearAllChats();
         this.chats = [];
         this.activeChatId = (await this.createChat()).id;
+        this.syncActiveChat();
       } catch (err) {
         this.error = handleError(err, 'Error clearing chats');
         throw err;
@@ -204,7 +179,7 @@ export const useChatStore = defineStore('chat', {
     },
 
     async renameChat (chatId: string, newTitle: string) {
-      const chat = this.findById(this.chats, chatId);
+      const chat = findById(this.chats, chatId);
       if (chat) {
         chat.title = newTitle;
         await this.persistChatMeta({ id: chatId, title: newTitle });
@@ -212,8 +187,12 @@ export const useChatStore = defineStore('chat', {
     },
 
     async addMessage (chatId: string, message: Omit<Message, 'id'>, attachment?: { content: string; type: AttachmentType; timestamp: number; meta: File }) {
-      const chat = this.findById(this.chats, chatId);
+      const chat = findById(this.chats, chatId);
       if (!chat) return null;
+
+      if (message.role !== 'user' && message.role !== 'assistant') {
+        return null;
+      }
 
       const newMessage: Message = {
         ...message,
@@ -229,16 +208,18 @@ export const useChatStore = defineStore('chat', {
           attachmentContent: attachment.content,
         }),
       };
+
       chat.messages.push(newMessage);
       chat.timestamp = Date.now();
       this.chats.sort((a, b) => b.timestamp - a.timestamp);
       await this.persistMessage(chatId, newMessage);
       await this.persistChatMeta({ id: chatId, timestamp: chat.timestamp });
+
       return newMessage.id;
     },
 
     async updateMessage (chatId: string, messageId: string, content: string, isLoading?: boolean, thinkTime?: number, isThinking?: boolean) {
-      const chat = this.findById(this.chats, chatId);
+      const chat = findById(this.chats, chatId);
       const message = chat?.messages.find(m => m.id === messageId);
       if (message) {
         message.content = content;
@@ -250,7 +231,7 @@ export const useChatStore = defineStore('chat', {
     },
 
     async generateChatTitle (chatId: string): Promise<void> {
-      const chat = this.findById(this.chats, chatId);
+      const chat = findById(this.chats, chatId);
       if (!chat || chat.messages.length < 1) return;
 
       const generateDefaultTitle = (content?: string): string =>
@@ -317,11 +298,10 @@ export const useChatStore = defineStore('chat', {
         this.abortController = new AbortController();
 
         const finalContent = content.trim() || '';
-        let images: string[] | undefined;
         let userMessageId: string | null;
         let searchResults: SearchResultItem[] | null = null;
-        let linkContent: { url: string, content?: string, error?: string } | null = null;
-        let textFileContent: { content: string, meta: { name: string, size: number } } | null = null;
+        let linkContent: { url: string; content?: string; error?: string } | null = null;
+        let textFileContent: { content: string; meta: { name: string; size: number } } | null = null;
         const hasAttachment = !!(attachmentContent && Object.keys(attachmentContent).length);
 
         const url = extractLink(finalContent);
@@ -376,9 +356,7 @@ export const useChatStore = defineStore('chat', {
             timestamp: Date.now(),
             content: attachmentContent!.content,
           });
-          if (attachmentContent!.type === AttachmentType.IMAGE) {
-            images = [attachmentContent!.content];
-          } else if (attachmentContent!.type === AttachmentType.TEXT) {
+          if (attachmentContent!.type === AttachmentType.TEXT) {
             textFileContent = { content: attachmentContent!.content, meta: { name: file.name, size: file.size } };
           }
         } else {
@@ -414,43 +392,17 @@ export const useChatStore = defineStore('chat', {
 
         this.abortController.signal.addEventListener('abort', cleanup);
 
-        const body = hasAttachment && attachmentContent!.type === AttachmentType.IMAGE
-          ? { model: this.selectedModel, prompt: finalContent, images, stream: true }
-          : {
-            model: this.selectedModel,
-            messages: (() => {
-              const messages: any[] = [];
-              if (chat.systemPrompt) {
-                messages.push({ role: 'system', content: chat.systemPrompt.content });
-              }
-              if (memoryContent) {
-                messages.push({ role: 'system', content: memoryContent });
-              }
-              chat.messages.forEach(msg => {
-                if (msg.id === userMessageId) {
-                  if (searchResults) {
-                    messages.push({ role: 'system', content: JSON.stringify(searchResults) });
-                  }
-                  if (linkContent) {
-                    messages.push({ role: 'system', content: JSON.stringify(linkContent) });
-                  }
-                  if (textFileContent && msg.attachmentMeta?.type === AttachmentType.TEXT) {
-                    messages.push({
-                      role: 'system',
-                      content: `[Attached: ${textFileContent.meta.name} [${formatFileSize(textFileContent.meta.size)}]]\n${textFileContent.content}`,
-                    });
-                  }
-                }
-                const message = {
-                  role: msg.role,
-                  content: msg.content,
-                };
-                messages.push(message);
-              });
-              return messages;
-            })(),
-            stream: true,
-          };
+        const { body, images } = buildOllamaRequestBody(
+          chat,
+          this.selectedModel,
+          userMessageId,
+          finalContent,
+          attachmentContent,
+          memoryContent,
+          searchResults,
+          linkContent,
+          textFileContent
+        );
 
         const response = await fetch(`${this.settings.ollamaURL}/api/${hasAttachment && attachmentContent!.type === AttachmentType.IMAGE ? 'generate' : 'chat'}`, {
           method: 'POST',
@@ -488,7 +440,7 @@ export const useChatStore = defineStore('chat', {
         });
 
         if (assistantMessageId) {
-          const finalThinkTime = isInThinkBlock && thinkStartTime ? Date.now() - thinkStartTime : this.findById(chat.messages, assistantMessageId)?.thinkTime;
+          const finalThinkTime = isInThinkBlock && thinkStartTime ? Date.now() - thinkStartTime : findById(chat.messages, assistantMessageId)?.thinkTime;
           if (thinkTimeInterval) clearInterval(thinkTimeInterval);
           await this.updateMessage(chatId, assistantMessageId, assistantContent, false, finalThinkTime, false);
         }
@@ -512,51 +464,91 @@ export const useChatStore = defineStore('chat', {
     },
 
     async editMessage (chatId: string, messageId: string, newContent: string, dropFollowing: boolean = false) {
-      const chat = this.findById(this.chats, chatId);
+      const chat = findById(this.chats, chatId);
       if (!chat) return;
 
-      const index = chat.messages.findIndex(m => m.id === messageId);
-      if (index !== -1) {
-        chat.messages[index].content = newContent;
+      try {
+        const index = chat.messages.findIndex(m => m.id === messageId);
+        if (index === -1) return;
+
+        const message = chat.messages[index];
+        if (message.role !== 'user') {
+          return;
+        }
+
         if (dropFollowing) {
+          message.content = newContent;
+          await this.persistMessage(chatId, message);
+
+          const messageIdsToDelete = chat.messages.slice(index + 1).map(m => m.id);
           chat.messages = chat.messages.slice(0, index + 1);
           chat.timestamp = Date.now();
           this.chats.sort((a, b) => b.timestamp - a.timestamp);
+
+          await deleteMessage(chatId, messageIdsToDelete);
           await this.persistChatMeta({ id: chatId, timestamp: chat.timestamp });
+
+          await this.sendMessage(chatId, newContent, message.attachmentContent ? {
+            content: message.attachmentContent,
+            type: message.attachmentMeta?.type || AttachmentType.TEXT,
+            meta: message.attachmentMeta as File,
+          } : undefined, this.memory.getMemoryContent);
+        } else {
+          message.content = newContent;
+          await this.persistMessage(chatId, message);
         }
-        await this.persistMessage(chatId, chat.messages[index]);
+      } catch (error) {
+        this.error = handleError(error, 'Failed to edit message');
       }
     },
 
     async deleteMessage (chatId: string, messageId: string) {
-      const chat = this.findById(this.chats, chatId);
+      const chat = findById(this.chats, chatId);
       if (!chat) return;
 
       try {
-        await deleteMessage(chatId, messageId);
-        chat.messages = chat.messages.filter(m => m.id !== messageId);
+        const index = chat.messages.findIndex(m => m.id === messageId);
+        if (index === -1) return;
+
+        const messageIdsToDelete = chat.messages.slice(index).map(m => m.id);
+
+        chat.messages = chat.messages.slice(0, index);
         chat.timestamp = Date.now();
         this.chats.sort((a, b) => b.timestamp - a.timestamp);
-        this.persistChatMeta({ id: chatId, timestamp: chat.timestamp })
+
+        await deleteMessage(chatId, messageIdsToDelete);
+        await this.persistChatMeta({ id: chatId, timestamp: chat.timestamp });
       } catch (error) {
-        this.error = handleError(error, 'Failed to delete message');
+        this.error = handleError(error, 'Failed to delete message and subsequent messages');
       }
     },
 
     async regenerateMessage (chatId: string, messageId: string) {
-      const chat = this.findById(this.chats, chatId);
+      const chat = findById(this.chats, chatId);
       if (!chat) return;
 
-      const index = chat.messages.findIndex(m => m.id === messageId);
-      if (index <= 0 || chat.messages[index - 1].role !== 'user') return;
+      try {
+        const index = chat.messages.findIndex(m => m.id === messageId);
+        if (index <= 0 || chat.messages[index - 1].role !== 'user') return;
 
-      const prevMessage = chat.messages[index - 1];
-      chat.messages = chat.messages.slice(0, index - 1);
-      await this.sendMessage(chatId, prevMessage.content, prevMessage.attachmentContent ? {
-        content: prevMessage.attachmentContent,
-        type: prevMessage.attachmentMeta?.type || AttachmentType.TEXT,
-        meta: prevMessage.attachmentMeta as File,
-      } as Attachment : null, this.memory.getMemoryContent);
+        const prevMessage = chat.messages[index - 1];
+        const messageIdsToDelete = chat.messages.slice(index - 1).map(m => m.id);
+
+        chat.messages = chat.messages.slice(0, index - 1);
+        chat.timestamp = Date.now();
+        this.chats.sort((a, b) => b.timestamp - a.timestamp);
+
+        await deleteMessage(chatId, messageIdsToDelete);
+        await this.persistChatMeta({ id: chatId, timestamp: chat.timestamp });
+
+        await this.sendMessage(chatId, prevMessage.content, prevMessage.attachmentContent ? {
+          content: prevMessage.attachmentContent,
+          type: prevMessage.attachmentMeta?.type || AttachmentType.TEXT,
+          meta: prevMessage.attachmentMeta as File,
+        } as Attachment : null, this.memory.getMemoryContent);
+      } catch (error) {
+        this.error = handleError(error, 'Failed to regenerate message');
+      }
     },
 
     async fetchModels () {

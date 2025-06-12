@@ -26,7 +26,6 @@
   useCopyCode(bubbleRef, showSnackbar);
 
   const parsedContent = computed(() => {
-    console.log(props.message);
     return parseMarkdown(props.message.content)
   });
 

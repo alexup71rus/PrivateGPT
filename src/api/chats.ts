@@ -61,45 +61,6 @@ export async function loadChats (): Promise<Chat[]> {
   }
 }
 
-// Unused
-// export async function saveChats (chats: Chat[]): Promise<void> {
-//   try {
-//     const client = await getGraphQLClient();
-//     for (const chat of chats) {
-//       const mutation = gql`
-//         mutation SaveChat($chat: ChatInput!) {
-//           saveChat(chat: $chat) {
-//             id
-//           }
-//         }
-//       `;
-//       const serializableChat = {
-//         id: chat.id,
-//         title: chat.title,
-//         timestamp: chat.timestamp,
-//         messages: chat.messages.map(message => ({
-//           id: message.id,
-//           content: message.content,
-//           role: message.role,
-//           timestamp: message.timestamp,
-//           attachmentMeta: message.attachmentMeta
-//             ? {
-//               type: message.attachmentMeta.type === AttachmentType.TEXT ? AttachmentType.TEXT : AttachmentType.IMAGE,
-//               name: message.attachmentMeta.name,
-//               size: message.attachmentMeta.size,
-//               lastModified: message.attachmentMeta.lastModified,
-//             }
-//             : null,
-//           attachmentContent: message.attachmentContent || null,
-//         })),
-//       };
-//       await client.request(mutation, { chat: serializableChat });
-//     }
-//   } catch (error) {
-//     handleGraphQLError(error);
-//   }
-// }
-
 export async function saveChat (chat: Chat): Promise<void> {
   try {
     const client = await getGraphQLClient();
@@ -341,9 +302,6 @@ export async function saveMessage (chatId: string, message: Message): Promise<vo
         }
         : null,
       attachmentContent: message.attachmentContent || null,
-      isLoading: message.isLoading || false,
-      thinkTime: message.thinkTime || null,
-      isThinking: message.isThinking || false,
     }));
     await client.request(mutation, { chatId, message: serializableMessage });
   } catch (error) {
@@ -351,15 +309,15 @@ export async function saveMessage (chatId: string, message: Message): Promise<vo
   }
 }
 
-export async function deleteMessage (chatId: string, messageId: string): Promise<void> {
+export async function deleteMessage (chatId: string, messageIds: string[]): Promise<void> {
   try {
     const client = await getGraphQLClient();
     const mutation = gql`
-      mutation DeleteMessage($chatId: String!, $messageId: String!) {
-        deleteMessage(chatId: $chatId, messageId: $messageId)
+      mutation DeleteMessage($chatId: String!, $messageIds: [String!]!) {
+        deleteMessage(chatId: $chatId, messageIds: $messageIds)
       }
     `;
-    await client.request(mutation, { chatId, messageId });
+    await client.request(mutation, { chatId, messageIds });
   } catch (error) {
     handleGraphQLError(error);
   }

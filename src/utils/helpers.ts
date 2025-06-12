@@ -1,3 +1,9 @@
+export const handleError = (error: unknown, defaultMessage: string): string => {
+  const message = error instanceof Error ? error.message : defaultMessage;
+  console.error(defaultMessage, error);
+  return message;
+};
+
 export function throttle<T extends (...args: any[]) => void> (fn: T, wait: number): T {
   let lastCall = 0;
   let timeout: ReturnType<typeof setTimeout> | null = null;
@@ -30,6 +36,11 @@ export function throttle<T extends (...args: any[]) => void> (fn: T, wait: numbe
   } as T;
 }
 
+export const createThrottledFunction = <T extends (...args: any[]) => Promise<any>>(
+  fn: T,
+  delay: number
+) => throttle(async (...args: Parameters<T>) => await fn(...args), delay);
+
 export function debounce<T extends (...args: any[]) => void> (fn: T, wait: number): T {
   let timeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -51,6 +62,32 @@ export const extractStringFromResponse = (responseContent: string): string => {
     // Not JSON or invalid JSON
   }
   return responseContent.trim();
+};
+
+export const processStream = async (
+  response: Response,
+  onChunk: (data: any) => Promise<void>
+) => {
+  if (!response.body) throw new Error('No response body');
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const lines = decoder.decode(value, { stream: true }).split('\n').filter(line => line.trim());
+    for (const line of lines) {
+      try {
+        const data = JSON.parse(line);
+        await onChunk(data);
+      } catch (e) {
+        console.error('Error parsing chunk:', e);
+      }
+    }
+  }
+};
+
+export const findById = <T>(array: T[], id: string, key: keyof T = 'id' as keyof T): T | undefined => {
+  return array.find(item => item[key] === id);
 };
 
 export function extractLink (text: string): string | null {

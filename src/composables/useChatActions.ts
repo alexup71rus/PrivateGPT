@@ -27,23 +27,25 @@ export function useChatActions () {
 
   const selectChat = async (chatId: string) => {
     try {
-      let tries = 10;
-      const interval = setInterval(async () => {
-        if (tries <= 0) {
-          clearInterval(interval);
+      if (!chat.chats.length) {
+        await chat.fetchChats();
+      }
+      if (chat.chats.some(c => c.id === chatId)) {
+        chat.activeChatId = chatId;
+        chat.syncActiveChat();
+        await navigateWithHash(chatId);
+      } else {
+        console.warn(`Chat with ID ${chatId} not found`);
+        if (chat.chats.length > 0) {
+          await selectChat(chat.chats[0].id);
+        } else {
+          await onNewChat();
         }
-
-        tries--;
-
-        if (chat.chats?.some(c => c.id === chatId)) {
-          chat.activeChatId = chatId;
-          await navigateWithHash(chatId);
-        }
-      }, 1)
+      }
     } catch (error) {
       console.error('Error selecting chat:', error);
     }
-  };
+  }
 
   const deleteChat = async (chatId: string) => {
     try {
@@ -57,10 +59,15 @@ export function useChatActions () {
         await chat.deleteChat(chatId);
         if (chat.chats.length > 0) {
           await selectChat(chat.chats[0].id);
+        } else {
+          await onNewChat();
         }
       }
     } catch (error) {
       console.error('Error deleting chat:', error);
+      if (chat.chats.length === 0) {
+        await onNewChat();
+      }
     }
   };
 

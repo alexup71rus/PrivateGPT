@@ -1,11 +1,10 @@
 <script lang="ts" setup>
   import AlertProvider from '@/components/Providers/AlertProvider.vue';
   import { useChatStore } from '@/stores/chat.ts';
-  import { onMounted } from 'vue';
+  import { nextTick, onMounted, ref } from 'vue';
   import { useAppRouting } from '@/composables/useAppRouting.ts';
   import { useAppStore } from '@/stores/app.ts';
   import { useChatActions } from '@/composables/useChatActions.ts';
-  import { useRoute } from 'vue-router';
   import { useSettingsStore } from '@/stores/settings.ts';
   import { useMemoryStore } from '@/stores/memory.ts';
   import { waitForBackend } from '@/api/chats.ts';
@@ -14,11 +13,11 @@
   const chat = useChatStore();
   const memory = useMemoryStore();
   const settingsStore = useSettingsStore();
-  const route = useRoute();
-  const { selectChat } = useChatActions();
   const { isChatPage } = useAppRouting();
+  const { initFromHash } = useChatActions();
 
   const isElectron = !!(window as any).electronAPI;
+  const isLoaded = ref(false);
 
   onMounted(async () => {
     await chat.checkOllamaConnection();
@@ -29,25 +28,10 @@
       return;
     }
 
-    const chatIdFromHash = window.location.hash.replace('#', '');
-    const chats = chat.chats;
-
-    if (chatIdFromHash) {
-      const selectedChat = chats.find(chat => chat.id === chatIdFromHash);
-      if (selectedChat) {
-        await selectChat(chatIdFromHash);
-        return;
-      }
-    }
-
-    const latestChat = chats[0];
-    if (latestChat && latestChat.title === settingsStore.settings.defaultChatTitle && latestChat.messages.length === 0) {
-      await selectChat(latestChat.id);
-      return;
-    }
-
-    const newChat = await chat.createChat();
-    await selectChat(newChat.id);
+    await nextTick();
+    await initFromHash();
+    await nextTick();
+    isLoaded.value = true;
   });
 
   const minimizeWindow = () => {
@@ -64,7 +48,7 @@
 </script>
 
 <template>
-  <v-app :class="{ electron: isElectron }">
+  <v-app v-if="isLoaded" :class="{ electron: isElectron }">
     <v-app-bar
       v-if="isElectron"
       app

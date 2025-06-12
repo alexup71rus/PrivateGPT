@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { ChatEntity } from './chat.entity';
 import { MessageEntity } from './message.entity';
 import { ChatMetaInput, MessageInput } from './chats.input';
@@ -22,7 +22,7 @@ export class ChatsService {
     const updatedChat = this.chatRepository.merge(chat, {
       title: meta.title ?? chat.title,
       timestamp: meta.timestamp ?? chat.timestamp,
-      systemPrompt: meta.systemPrompt ?? chat.systemPrompt, // Добавляем systemPrompt
+      systemPrompt: meta.systemPrompt ?? chat.systemPrompt,
     });
     return this.chatRepository.save(updatedChat);
   }
@@ -45,14 +45,14 @@ export class ChatsService {
     return this.messageRepository.save(messageEntity);
   }
 
-  async deleteMessage(chatId: string, messageId: string): Promise<boolean> {
+  async deleteMessage(chatId: string, messageIds: string[]): Promise<boolean> {
     const chat = await this.chatRepository.findOne({ where: { id: chatId } });
     if (!chat) {
       throw new Error(`Chat with id ${chatId} not found`);
     }
 
     const result = await this.messageRepository.delete({
-      id: messageId,
+      id: In(messageIds),
       chat: { id: chatId },
     });
     return result.affected ? result.affected > 0 : false;

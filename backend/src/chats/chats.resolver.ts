@@ -163,9 +163,9 @@ export class ChatsResolver {
   @Mutation(() => Boolean)
   async deleteMessage(
     @Args('chatId') chatId: string,
-    @Args('messageId') messageId: string,
+    @Args('messageIds', { type: () => [String] }) messageIds: string[],
   ): Promise<boolean> {
-    return this.chatsService.deleteMessage(chatId, messageId);
+    return this.chatsService.deleteMessage(chatId, messageIds);
   }
 
   @Mutation(() => Chat)
