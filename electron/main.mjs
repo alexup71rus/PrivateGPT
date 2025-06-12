@@ -1,14 +1,22 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
+import { createWriteStream, mkdirSync, readFileSync } from 'fs';
+import { createServer } from 'http';
 import { spawn } from 'node:child_process';
+import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const logDir = path.join(os.homedir(), 'Library', 'Logs', 'MyAppName');
+mkdirSync(logDir, { recursive: true });
+const logStream = createWriteStream(path.join(logDir, 'app.log'), { flags: 'a' });
+const log = (...args) => logStream.write(`[${new Date().toISOString()}] ${args.join(' ')}\n`);
+
 const config = {
   backend: {
-    entry: path.join(__dirname, '../backend/dist/main.js'),
+    entry: path.join(app.getAppPath(), 'backend/dist/main.js'),
     port: 3001,
     env: {
       PORT: '3001',
@@ -26,26 +34,58 @@ const config = {
 let mainWindow = null;
 let backendProcess = null;
 
+const server = createServer((req, res) => {
+  try {
+    const filePath = path.join(__dirname, '../dist', req.url === '/' || req.url.startsWith('/settings') ? 'index.html' : req.url).split('?')[0];
+    const content = readFileSync(filePath);
+    const ext = path.extname(filePath).toLowerCase();
+    let contentType = 'text/html';
+    if (ext === '.css') contentType = 'text/css';
+    else if (ext === '.js') contentType = 'application/javascript';
+    else if (ext === '.woff2' || ext === '.woff') contentType = 'font/woff2';
+    else if (ext === '.png' || ext === '.jpg' || ext === '.jpeg') contentType = 'image/jpeg';
+    else if (ext === '.svg') contentType = 'image/svg+xml';
+    res.writeHead(200, { 'Content-Type': contentType });
+    res.end(content);
+  } catch (e) {
+    log('File not found:', e.message);
+    res.writeHead(404);
+    res.end('Not Found');
+  }
+});
+
+server.listen(3002, () => {
+  log('Frontend server running on http://localhost:3002');
+});
+
 function startBackend () {
   if (backendProcess) {
-    console.warn('Backend process already running!');
+    log('Backend process already running!');
     return;
   }
 
-  console.log('Starting backend:', config.backend.entry);
+  log('Starting backend:', config.backend.entry);
 
-  backendProcess = spawn('node', [config.backend.entry], {
-    stdio: 'inherit',
+  backendProcess = spawn('/usr/local/bin/node', [config.backend.entry], {
+    stdio: 'pipe',
     env: { ...process.env, ...config.backend.env },
   });
 
+  backendProcess.stdout.on('data', data => {
+    log(`Backend stdout: ${data}`);
+  });
+
+  backendProcess.stderr.on('data', data => {
+    log(`Backend stderr: ${data}`);
+  });
+
   backendProcess.on('error', err => {
-    console.error('❌ Backend failed to start:', err);
+    log('❌ Backend failed to start:', err.message);
     backendProcess = null;
   });
 
   backendProcess.on('exit', code => {
-    console.log(`🔴 Backend exited with code ${code}`);
+    log(`🔴 Backend exited with code ${code}`);
     backendProcess = null;
   });
 }
@@ -67,7 +107,7 @@ function setupIpcHandlers () {
 
 function createWindow () {
   if (mainWindow) {
-    console.warn('Main window already exists! Focusing it instead.');
+    log('Main window already exists! Focusing it instead.');
     mainWindow.focus();
     return;
   }
@@ -88,12 +128,14 @@ function createWindow () {
   });
 
   if (isDev) {
-    console.log('🚀 Running in development mode');
+    log('🚀 Running in development mode');
     mainWindow.loadURL('http://localhost:3002');
     mainWindow.webContents.openDevTools();
   } else {
-    console.log('🏁 Running in production mode');
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+    log('🏁 Running in production mode');
+    setTimeout(() => {
+      mainWindow.loadURL('http://localhost:3002');
+    }, 2000);
   }
 
   setupIpcHandlers();
@@ -106,7 +148,7 @@ function createWindow () {
 
   mainWindow.webContents.on('did-fail-load', () => {
     if (reloadAttempts <= 0) {
-      console.error('Failed to load after multiple attempts');
+      log('Failed to load after multiple attempts');
       return;
     }
     reloadAttempts--;
@@ -121,19 +163,21 @@ function createWindow () {
 
 function cleanup () {
   if (backendProcess) {
-    console.log('Terminating backend process...');
+    log('Terminating backend process...');
     backendProcess.kill();
     backendProcess = null;
   }
+  server.close(() => {
+    log('Frontend server stopped');
+  });
 }
 
 app.whenReady()
   .then(() => {
-    console.log('App is ready!');
-    createWindow();
+    log('🟢 App is ready!');
     startBackend();
+    createWindow();
 
-    // macOS hint
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {
         createWindow();
@@ -141,13 +185,12 @@ app.whenReady()
     });
   })
   .catch(err => {
-    console.error('Failed to start app:', err);
+    log('💥 Failed to start app:', err);
     cleanup();
     app.quit();
   });
 
 app.on('window-all-closed', () => {
-  // macOS hint
   if (process.platform !== 'darwin') {
     cleanup();
     app.quit();

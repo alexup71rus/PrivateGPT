@@ -1,16 +1,36 @@
 import { defineStore } from 'pinia';
 import { useHttpService } from '@/plugins/httpPlugin';
-import { clearAllChats, deleteChat, loadChats, saveChat, searchBackend, waitForBackend } from '@/api/chats';
+import {
+  clearAllChats,
+  deleteChat,
+  deleteMessage,
+  fetchLinkContent,
+  loadChats,
+  saveChat,
+  saveChatMeta,
+  saveMessage,
+  searchBackend,
+  waitForBackend,
+} from '@/api/chats';
 import { type OllamaModel, type OllamaTagsResponse } from '@/types/ollama.ts';
 import { type Attachment, AttachmentType, type Chat, type Message } from '@/types/chats.ts';
-import { extractStringFromResponse, throttle } from '@/utils/helpers.ts';
+import { extractLink, extractStringFromResponse, throttle } from '@/utils/helpers.ts';
 import { type ISettings, type SystemPrompt } from '@/types/settings.ts';
 import { useSettingsStore } from '@/stores/settings.ts';
 import { useMemoryStore } from '@/stores/memory.ts';
 import type { SearchResultItem } from '../../backend/src/search/search.service.ts';
+import { formatFileSize } from '@/utils/chatUtils.ts';
 
 const throttledSaveChat = throttle(async (chat: Chat) => {
   await saveChat(chat);
+}, 2000);
+
+const throttledSaveMessage = throttle(async (chatId: string, message: Message) => {
+  await saveMessage(chatId, message);
+}, 800);
+
+const throttledSaveChatMeta = throttle(async (meta: { id: string; title?: string; timestamp?: number; systemPrompt?: string | null }) => {
+  await saveChatMeta(meta);
 }, 800);
 
 const handleError = (error: unknown, defaultMessage: string): string => {
@@ -104,6 +124,22 @@ export const useChatStore = defineStore('chat', {
       }
     },
 
+    async persistMessage (chatId: string, message: Message) {
+      try {
+        await throttledSaveMessage(chatId, message);
+      } catch (error) {
+        this.error = handleError(error, 'Failed to persist message');
+      }
+    },
+
+    async persistChatMeta (meta: { id: string; title?: string; timestamp?: number; systemPrompt?: string | null }) {
+      try {
+        await throttledSaveChatMeta(meta);
+      } catch (error) {
+        this.error = handleError(error, 'Failed to persist chat meta');
+      }
+    },
+
     findById<T>(array: T[], id: string, key: keyof T = 'id' as keyof T): T | undefined {
       return array.find(item => item[key] === id);
     },
@@ -134,7 +170,7 @@ export const useChatStore = defineStore('chat', {
       const chat = this.chats.find(c => c.id === chatId);
       if (chat) {
         chat.systemPrompt = systemPrompt;
-        await this.persistChat(chatId);
+        await this.persistChatMeta({ id: chatId, systemPrompt: systemPrompt?.content ?? null });
       }
     },
 
@@ -171,7 +207,7 @@ export const useChatStore = defineStore('chat', {
       const chat = this.findById(this.chats, chatId);
       if (chat) {
         chat.title = newTitle;
-        await this.persistChat(chatId);
+        await this.persistChatMeta({ id: chatId, title: newTitle });
       }
     },
 
@@ -196,7 +232,8 @@ export const useChatStore = defineStore('chat', {
       chat.messages.push(newMessage);
       chat.timestamp = Date.now();
       this.chats.sort((a, b) => b.timestamp - a.timestamp);
-      await this.persistChat(chatId);
+      await this.persistMessage(chatId, newMessage);
+      await this.persistChatMeta({ id: chatId, timestamp: chat.timestamp });
       return newMessage.id;
     },
 
@@ -208,7 +245,7 @@ export const useChatStore = defineStore('chat', {
         if (isLoading !== undefined) message.isLoading = isLoading;
         if (thinkTime !== undefined) message.thinkTime = thinkTime;
         if (isThinking !== undefined) message.isThinking = isThinking;
-        await this.persistChat(chatId);
+        await this.persistMessage(chatId, message);
       }
     },
 
@@ -267,7 +304,6 @@ export const useChatStore = defineStore('chat', {
 
     async sendMessage (chatId: string, content: string, attachmentContent?: Attachment | null, memoryContent?: string | null) {
       try {
-        console.log('sendMessage input:', { content, attachmentContent });
         const chat = this.activeChat;
         if (!chat) throw new Error('No active chat');
         if (!this.models.length) throw new Error('No models available');
@@ -284,8 +320,19 @@ export const useChatStore = defineStore('chat', {
         let images: string[] | undefined;
         let userMessageId: string | null;
         let searchResults: SearchResultItem[] | null = null;
+        let linkContent: { url: string, content?: string, error?: string } | null = null;
+        let textFileContent: { content: string, meta: { name: string, size: number } } | null = null;
+        const hasAttachment = !!(attachmentContent && Object.keys(attachmentContent).length);
 
-        if (this.isSearchActive) {
+        const url = extractLink(finalContent);
+        if (url) {
+          try {
+            const result = await fetchLinkContent(url);
+            linkContent = { url, content: result.content, error: result.error };
+          } catch (error) {
+            linkContent = { url, error: 'Failed to fetch link content' };
+          }
+        } else if (this.isSearchActive) {
           try {
             const searchModel = this.settings.searchModel || this.settings.selectedModel || this.settings.systemModel;
             if (!searchModel) throw new Error('No search model available');
@@ -321,24 +368,21 @@ export const useChatStore = defineStore('chat', {
           }
         }
 
-        if (attachmentContent && Object.keys(attachmentContent).length) {
-          const file = attachmentContent.meta;
-          const metaInfo = `[Attached: ${file.name}, ${file.size} bytes, modified ${new Date(file.lastModified).toLocaleDateString()}]`;
+        if (hasAttachment) {
+          const file = attachmentContent!.meta;
           userMessageId = await this.addMessage(chatId, { role: 'user', content: finalContent, timestamp: Date.now() }, {
-            ...attachmentContent,
-            type: attachmentContent.type === AttachmentType.TEXT ? AttachmentType.TEXT : AttachmentType.IMAGE,
+            ...attachmentContent!,
+            type: attachmentContent!.type === AttachmentType.TEXT ? AttachmentType.TEXT : AttachmentType.IMAGE,
             timestamp: Date.now(),
-            content: attachmentContent.type === AttachmentType.TEXT
-              ? `${attachmentContent.content}\n${metaInfo}`
-              : attachmentContent.content,
+            content: attachmentContent!.content,
           });
-          console.log('Message added with attachment:', { finalContent, userMessageId });
-          if (attachmentContent.type === AttachmentType.IMAGE) {
-            images = [attachmentContent.content];
+          if (attachmentContent!.type === AttachmentType.IMAGE) {
+            images = [attachmentContent!.content];
+          } else if (attachmentContent!.type === AttachmentType.TEXT) {
+            textFileContent = { content: attachmentContent!.content, meta: { name: file.name, size: file.size } };
           }
         } else {
           userMessageId = await this.addMessage(chatId, { role: 'user', content: finalContent, timestamp: Date.now() });
-          console.log('Message added without attachment:', { finalContent, userMessageId });
         }
 
         if (!userMessageId) {
@@ -370,35 +414,45 @@ export const useChatStore = defineStore('chat', {
 
         this.abortController.signal.addEventListener('abort', cleanup);
 
-        const body = images
+        const body = hasAttachment && attachmentContent!.type === AttachmentType.IMAGE
           ? { model: this.selectedModel, prompt: finalContent, images, stream: true }
           : {
             model: this.selectedModel,
-            messages: [
-              ...(chat.systemPrompt ? [{ role: 'system', content: chat.systemPrompt.content }] : []),
-              ...(memoryContent ? [{ role: 'system', content: memoryContent }] : []),
-              ...(searchResults ? [{ role: 'system', content: JSON.stringify(searchResults) }] : []),
-              ...chat.messages.map(msg => {
+            messages: (() => {
+              const messages: any[] = [];
+              if (chat.systemPrompt) {
+                messages.push({ role: 'system', content: chat.systemPrompt.content });
+              }
+              if (memoryContent) {
+                messages.push({ role: 'system', content: memoryContent });
+              }
+              chat.messages.forEach(msg => {
+                if (msg.id === userMessageId) {
+                  if (searchResults) {
+                    messages.push({ role: 'system', content: JSON.stringify(searchResults) });
+                  }
+                  if (linkContent) {
+                    messages.push({ role: 'system', content: JSON.stringify(linkContent) });
+                  }
+                  if (textFileContent && msg.attachmentMeta?.type === AttachmentType.TEXT) {
+                    messages.push({
+                      role: 'system',
+                      content: `[Attached: ${textFileContent.meta.name} [${formatFileSize(textFileContent.meta.size)}]]\n${textFileContent.content}`,
+                    });
+                  }
+                }
                 const message = {
                   role: msg.role,
                   content: msg.content,
-                  ...(msg.attachmentContent && msg.attachmentMeta?.type === AttachmentType.IMAGE ? { images: [msg.attachmentContent] } : {}),
                 };
-
-                if (msg.attachmentContent && msg.attachmentMeta?.type === AttachmentType.TEXT) {
-                  const fileContent = msg.attachmentContent.split(`[Attached: ${msg.attachmentMeta.name}`)[0].trim();
-                  return {
-                    ...message,
-                    content: `${msg.content}\n\n[File content: ${msg.attachmentMeta.name}]\n${fileContent}`,
-                  };
-                }
-                return message;
-              }),
-            ],
+                messages.push(message);
+              });
+              return messages;
+            })(),
             stream: true,
           };
 
-        const response = await fetch(`${this.settings.ollamaURL}/api/${images ? 'generate' : 'chat'}`, {
+        const response = await fetch(`${this.settings.ollamaURL}/api/${hasAttachment && attachmentContent!.type === AttachmentType.IMAGE ? 'generate' : 'chat'}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
@@ -406,7 +460,7 @@ export const useChatStore = defineStore('chat', {
         });
 
         await processStream(response, async data => {
-          const chunkContent = images ? data.response : data.message?.content;
+          const chunkContent = hasAttachment && attachmentContent!.type === AttachmentType.IMAGE ? data.response : data.message?.content;
           if (!chunkContent) return;
 
           if (chunkContent.includes('<think>') && !isInThinkBlock) {
@@ -446,7 +500,6 @@ export const useChatStore = defineStore('chat', {
         }
 
         this.chats.sort((a, b) => b.timestamp - a.timestamp);
-        await this.persistChat(chatId);
       } catch (error: any) {
         if (error.name !== 'AbortError') {
           this.error = handleError(error, 'Failed to stream message from Ollama');
@@ -465,8 +518,13 @@ export const useChatStore = defineStore('chat', {
       const index = chat.messages.findIndex(m => m.id === messageId);
       if (index !== -1) {
         chat.messages[index].content = newContent;
-        if (dropFollowing) chat.messages = chat.messages.slice(0, index + 1);
-        await this.persistChat(chatId);
+        if (dropFollowing) {
+          chat.messages = chat.messages.slice(0, index + 1);
+          chat.timestamp = Date.now();
+          this.chats.sort((a, b) => b.timestamp - a.timestamp);
+          await this.persistChatMeta({ id: chatId, timestamp: chat.timestamp });
+        }
+        await this.persistMessage(chatId, chat.messages[index]);
       }
     },
 
@@ -474,10 +532,14 @@ export const useChatStore = defineStore('chat', {
       const chat = this.findById(this.chats, chatId);
       if (!chat) return;
 
-      const index = chat.messages.findIndex(m => m.id === messageId);
-      if (index !== -1) {
-        chat.messages = chat.messages.slice(0, index);
-        await this.persistChat(chatId);
+      try {
+        await deleteMessage(chatId, messageId);
+        chat.messages = chat.messages.filter(m => m.id !== messageId);
+        chat.timestamp = Date.now();
+        this.chats.sort((a, b) => b.timestamp - a.timestamp);
+        this.persistChatMeta({ id: chatId, timestamp: chat.timestamp })
+      } catch (error) {
+        this.error = handleError(error, 'Failed to delete message');
       }
     },
 
@@ -490,8 +552,6 @@ export const useChatStore = defineStore('chat', {
 
       const prevMessage = chat.messages[index - 1];
       chat.messages = chat.messages.slice(0, index - 1);
-      await this.persistChat(chat.id);
-
       await this.sendMessage(chatId, prevMessage.content, prevMessage.attachmentContent ? {
         content: prevMessage.attachmentContent,
         type: prevMessage.attachmentMeta?.type || AttachmentType.TEXT,

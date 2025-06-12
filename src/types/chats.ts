@@ -42,9 +42,17 @@ export interface Chat {
   title: string;
   messages: Message[];
   timestamp: number;
-  systemPrompt?: SystemPrompt | null;
+  systemPrompt: SystemPrompt | null;
 }
 
 export interface ChatModel {
   name: string;
+}
+
+export interface LinkContent {
+  url: string;
+  title?: string;
+  description?: string;
+  content?: string;
+  error?: string;
 }

@@ -26,6 +26,7 @@ export const DEFAULT_SETTINGS = {
   systemModel: '' as string,
   titlePrompt: 'Generate a concise chat title (2-5 words, up to 50 characters) summarizing the topic based on the provided messages. Use the same language as the user’s message. Include a relevant emoji only if it enhances clarity. Return the title as plain text. Examples:\n' +
     '- English: "🐍 Python Snake Game" for user: "Write a snake game in Python"\n' +
+    '- Russian: "👋 Привет" for user: "Привет"\n' +
     '- Russian: "🐱 Вибриссы у котов" for user: "Как называются усы у котов?"\n' +
     '- French: "🇫🇷 Voyage à Paris" for user: "Plan a trip to Paris"\n' +
     '- Spanish: "🍜 Receta de Ramen" for user: "Escribe una receta de ramen"' as string,

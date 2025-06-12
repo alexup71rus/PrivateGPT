@@ -52,3 +52,8 @@ export const extractStringFromResponse = (responseContent: string): string => {
   }
   return responseContent.trim();
 };
+
+export function extractLink (text: string): string | null {
+  const urlMatch = text.match(/(https?:\/\/|ftp:\/\/|www\.)[^\s/$.?#].[^\s]*/i);
+  return urlMatch ? urlMatch[0] : null;
+}

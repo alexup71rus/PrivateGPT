@@ -34,7 +34,6 @@
 .attachment-preview {
   &__title {
     display: inline-block;
-    width: min-content;
     margin: 16px auto;
     padding: 4px 8px;
     text-align: center;

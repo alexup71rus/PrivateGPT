@@ -167,6 +167,17 @@
     max-width: 800px;
   }
 
+  .message-wrapper::v-deep(.actions) {
+    opacity: .15;
+    transition: opacity ease-in-out .2s;
+    transition-delay: .15s;
+  }
+
+  .message-wrapper:hover::v-deep(.actions) {
+    opacity: 1;
+    transition-delay: 0s;
+  }
+
   .loader {
     display: flex;
     justify-content: center;

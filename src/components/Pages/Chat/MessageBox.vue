@@ -16,6 +16,8 @@
   const messageText = ref('');
   const attachment = ref<File | null>(null);
   const attachmentContent = ref<AttachmentContent | null>(null);
+  const promptMenu = ref(false);
+  const promptSearch = ref('');
 
   const activeChat = computed(() => chat.activeChat);
   const activeChatId = computed(() => chat.activeChatId);
@@ -37,6 +39,15 @@
     if (!prompt && !settingsStore.settings.defaultSystemPrompt) return true;
     return prompt && settingsStore.settings.defaultSystemPrompt?.title === prompt.title;
   });
+  const filteredPrompts = computed(() => {
+    if (!promptSearch.value) {
+      return [...systemPrompts.value, { title: 'No default', content: '' }];
+    }
+    const filtered = systemPrompts.value.filter(prompt =>
+      prompt.title.toLowerCase().includes(promptSearch.value.toLowerCase())
+    );
+    return filtered.length > 0 ? filtered : [{ title: 'No default', content: '' }];
+  });
 
   const setDefaultModel = () => selectedModel.value && settingsStore.updateSettings({ defaultModel: selectedModel.value });
 
@@ -51,13 +62,17 @@
 
   const selectPrompt = (prompt: SystemPrompt | null) => {
     if (activeChatId.value) {
+      promptMenu.value = false;
       chat.setSystemPrompt(activeChatId.value, prompt);
-      selectedPrompt.value = prompt;
+      setTimeout(() => {
+        selectedPrompt.value = prompt;
+        promptSearch.value = prompt?.title || '';
+      }, 100)
     }
   };
 
   const truncateContent = (content: string) => {
-    if (!content) return '';
+    if (!content) return 'No content';
     const firstLine = content.split('\n')[0];
     return firstLine.length > 50 ? firstLine.slice(0, 50) + '...' : firstLine + (content.includes('\n') ? '...' : '');
   };
@@ -132,10 +147,21 @@
     }
   };
 
+  const handlePromptInput = (value: string) => {
+    promptSearch.value = value;
+    promptMenu.value = true;
+  };
+
+  const handleClear = () => {
+    promptSearch.value = '';
+    selectPrompt(null);
+  };
+
   onMounted(() => {
     nextTick(() => textareaRef.value?.focus());
     if (isChatEmpty.value && !activeChat.value?.systemPrompt) {
       selectedPrompt.value = settingsStore.settings.defaultSystemPrompt;
+      promptSearch.value = selectedPrompt.value?.title || '';
     }
   });
 
@@ -145,6 +171,7 @@
 
   watch(() => activeChat.value?.systemPrompt, newPrompt => {
     selectedPrompt.value = newPrompt || settingsStore.settings.defaultSystemPrompt;
+    promptSearch.value = selectedPrompt.value?.title || '';
   }, { deep: true });
 </script>
 
@@ -160,39 +187,56 @@
     <div class="chat-input-container">
       <div v-if="isChatEmpty" class="prompt-autocomplete-wrapper">
         <div class="prompt-autocomplete-backdrop" />
-        <v-autocomplete
-          v-model="selectedPrompt"
-          class="prompt-autocomplete"
-          hide-details
-          item-title="title"
-          item-value="title"
-          :items="[...systemPrompts, { title: 'No default', content: '' }]"
-          label="Select system prompt"
-          :menu-props="{ maxHeight: 300 }"
-          return-object
-          variant="solo-filled"
+        <v-menu
+          v-model="promptMenu"
+          :close-on-content-click="false"
+          location="top"
+          offset-y
         >
-          <template #item="{ item, props }">
-            <v-list-item
+          <template #activator="{ props }">
+            <v-text-field
+              v-model="promptSearch"
+              append-inner-icon="mdi-chevron-down"
               v-bind="props"
-              class="prompt-item"
-              :subtitle="truncateContent(item.raw.content)"
-              :title="item.raw.title"
-              @click="selectPrompt(item.raw.title === 'No default' ? null : item.raw)"
-            >
-              <template #append>
-                <v-btn
-                  v-if="!isDefaultPrompt(item.raw.title === 'No default' ? null : item.raw)"
-                  color="primary"
-                  density="compact"
-                  icon="mdi-check-circle"
-                  variant="text"
-                  @click.stop="setDefaultPrompt(item.raw.title === 'No default' ? null : item.raw)"
-                />
-              </template>
-            </v-list-item>
+              autocomplete="off"
+              class="prompt-input"
+              clearable
+              hide-details
+              placeholder="Select system prompt"
+              variant="solo-filled"
+              @click:clear="handleClear"
+              @input="handlePromptInput($event.target.value)"
+              @keydown.enter.prevent="promptMenu = false"
+            />
           </template>
-        </v-autocomplete>
+          <v-card min-width="300">
+            <v-card-text class="pa-2">
+              <div class="prompt-list">
+                <v-list-item
+                  v-for="prompt in filteredPrompts"
+                  :key="prompt.title"
+                  :active="prompt.title === selectedPrompt?.title"
+                  :class="{ 'v-list-item--active': prompt.title === selectedPrompt?.title }"
+                  :subtitle="truncateContent(prompt.content)"
+                  :value="prompt.title"
+                  @click="selectPrompt(prompt.title === 'No default' ? null : prompt)"
+                >
+                  <div class="prompt-item">
+                    {{ prompt.title }}
+                    <v-btn
+                      v-if="!isDefaultPrompt(prompt.title === 'No default' ? null : prompt)"
+                      color="primary"
+                      density="compact"
+                      icon="mdi-check-circle"
+                      variant="text"
+                      @click.stop="setDefaultPrompt(prompt.title === 'No default' ? null : prompt)"
+                    />
+                  </div>
+                </v-list-item>
+              </div>
+            </v-card-text>
+          </v-card>
+        </v-menu>
       </div>
 
       <v-textarea
@@ -366,7 +410,11 @@
   z-index: -1;
 }
 
-.prompt-autocomplete {
+::v-deep(.v-input__control input) {
+  cursor: text;
+}
+
+.prompt-input {
   ::v-deep(.v-field) {
     background-color: rgb(var(--v-theme-surface));
     border-radius: 20px;
@@ -381,21 +429,29 @@
   }
 }
 
+.prompt-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 300px;
+  overflow: auto;
+}
+
 .prompt-item {
-  ::v-deep(.v-list-item-title) {
-    font-size: 1rem;
-    color: rgb(var(--v-theme-on-surface));
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  ::v-deep(.v-list-item-subtitle) {
-    font-size: 0.875rem;
-    color: rgb(var(--v-theme-on-surface));
-    opacity: 0.6;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-wrap: nowrap;
+  font-size: 1rem;
+  color: rgb(var(--v-theme-on-surface));
+
+  ::v-deep(.v-btn) {
+    position: absolute;
+    top: 20%;
+    right: 2px;
   }
 }
 
@@ -432,7 +488,7 @@
   }
 
   ::v-deep(.v-btn__prepend) {
-    margin-inline: -4px 8px;
+    margin-inline: -4px 4px;
   }
 
   .file-btn.text-blue {

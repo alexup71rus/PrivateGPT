@@ -92,9 +92,11 @@
         { text: 'Да', color: 'warning', value: true },
         { text: 'Отмена', color: 'white', value: false },
       ],
-      resolve: () => {
-        chat.clearChats();
-        showSnackbar({ message: 'Все чаты успешно удалены', type: 'success' });
+      resolve: res => {
+        if (res) {
+          chat.clearChats();
+          showSnackbar({ message: 'Все чаты успешно удалены', type: 'success' });
+        }
       },
     });
   };

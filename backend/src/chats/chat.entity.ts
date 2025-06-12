@@ -1,4 +1,4 @@
-import { Entity, PrimaryColumn, Column, OneToMany } from 'typeorm';
+import { Column, Entity, OneToMany, PrimaryColumn } from 'typeorm';
 import { MessageEntity } from './message.entity';
 
 @Entity()
@@ -11,6 +11,9 @@ export class ChatEntity {
 
   @Column()
   timestamp: number;
+
+  @Column({ nullable: true })
+  systemPrompt?: string;
 
   @OneToMany(() => MessageEntity, (message) => message.chat, {
     cascade: true,
