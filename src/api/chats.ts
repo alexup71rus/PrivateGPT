@@ -37,24 +37,40 @@ export async function loadChats (): Promise<Chat[]> {
           id
           title
           timestamp
-          messages {
-            id
-            content
-            role
-            timestamp
-            attachmentMeta {
-              type
-              name
-              size
-              lastModified
-            }
-            attachmentContent
-          }
+          systemPrompt
         }
       }
     `;
     const { getChats } = await client.request<{ getChats: Chat[] }>(query);
     return (getChats || []).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+  } catch (error) {
+    handleGraphQLError(error);
+    return [];
+  }
+}
+
+export async function loadChatMessages (chatId: string): Promise<Message[]> {
+  try {
+    const client = await getGraphQLClient();
+    const query = gql`
+      query GetChatMessages($chatId: String!) {
+        getChatMessages(chatId: $chatId) {
+          id
+          content
+          role
+          timestamp
+          attachmentMeta {
+            type
+            name
+            size
+            lastModified
+          }
+          attachmentContent
+        }
+      }
+    `;
+    const { getChatMessages } = await client.request<{ getChatMessages: Message[] }>(query, { chatId });
+    return getChatMessages || [];
   } catch (error) {
     handleGraphQLError(error);
     return [];

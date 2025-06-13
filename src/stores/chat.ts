@@ -5,6 +5,7 @@ import {
   deleteChat,
   deleteMessage,
   fetchLinkContent,
+  loadChatMessages,
   loadChats,
   saveChat,
   saveChatMeta,
@@ -60,8 +61,16 @@ export const useChatStore = defineStore('chat', {
     selectedModel: state => state.settings.selectedModel || state.settings.systemModel || state.models[0]?.name || '',
   },
   actions: {
-    syncActiveChat () {
-      this.activeChat = (this.chats.find(chat => chat.id === this.activeChatId) || null);
+    async syncActiveChat () {
+      const chat = this.chats.find(chat => chat.id === this.activeChatId);
+      if (chat) {
+        this.activeChat = { ...chat, messages: chat.messages || [] };
+        if (!chat.messages) {
+          await this.fetchChatMessages(this.activeChatId);
+        }
+      } else {
+        this.activeChat = null;
+      }
     },
 
     async checkOllamaConnection () {
@@ -80,10 +89,27 @@ export const useChatStore = defineStore('chat', {
         this.chats = (await loadChats()).map(chat => ({
           ...chat,
           systemPrompt: chat.systemPrompt || null,
+          messages: [],
         }));
         this.syncActiveChat();
       } catch (err) {
         this.error = handleError(err, 'Failed to load chats');
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    async fetchChatMessages (chatId: string) {
+      this.loading = true;
+      try {
+        const messages = await loadChatMessages(chatId);
+        const chat = this.chats.find(c => c.id === chatId);
+        if (chat) {
+          chat.messages = messages;
+          this.syncActiveChat();
+        }
+      } catch (err) {
+        this.error = handleError(err, `Failed to load messages for chat ${chatId}`);
       } finally {
         this.loading = false;
       }
@@ -151,7 +177,7 @@ export const useChatStore = defineStore('chat', {
       this.loading = true;
       try {
         await deleteChat(chatId);
-        await this.fetchChats();
+        this.chats = this.chats.filter(c => c.id !== chatId);
         if (this.activeChatId === chatId) {
           this.activeChatId = this.chats[0]?.id || (await this.createChat()).id;
           this.syncActiveChat();
@@ -519,6 +545,7 @@ export const useChatStore = defineStore('chat', {
 
         await deleteMessage(chatId, messageIdsToDelete);
         await this.persistChatMeta({ id: chatId, timestamp: chat.timestamp });
+        await this.fetchChatMessages(chatId);
       } catch (error) {
         this.error = handleError(error, 'Failed to delete message and subsequent messages');
       }
@@ -541,6 +568,7 @@ export const useChatStore = defineStore('chat', {
 
         await deleteMessage(chatId, messageIdsToDelete);
         await this.persistChatMeta({ id: chatId, timestamp: chat.timestamp });
+        await this.fetchChatMessages(chatId);
 
         await this.sendMessage(chatId, prevMessage.content, prevMessage.attachmentContent ? {
           content: prevMessage.attachmentContent,

@@ -32,6 +32,7 @@ export function useChatActions () {
       }
       if (chat.chats.some(c => c.id === chatId)) {
         chat.activeChatId = chatId;
+        await chat.fetchChatMessages(chatId);
         chat.syncActiveChat();
         await navigateWithHash(chatId);
       } else {
@@ -45,7 +46,7 @@ export function useChatActions () {
     } catch (error) {
       console.error('Error selecting chat:', error);
     }
-  }
+  };
 
   const deleteChat = async (chatId: string) => {
     try {

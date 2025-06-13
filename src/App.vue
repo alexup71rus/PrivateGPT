@@ -30,6 +30,9 @@
 
     await nextTick();
     await initFromHash();
+    if (chat.activeChatId) {
+      await chat.fetchChatMessages(chat.activeChatId);
+    }
     await nextTick();
     isLoaded.value = true;
   });

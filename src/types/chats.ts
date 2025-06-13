@@ -40,9 +40,9 @@ export interface Message {
 export interface Chat {
   id: string;
   title: string;
-  messages: Message[];
   timestamp: number;
   systemPrompt: SystemPrompt | null;
+  messages?: Message[];
 }
 
 export interface ChatModel {

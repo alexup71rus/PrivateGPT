@@ -70,10 +70,10 @@ class Chat {
   timestamp: number;
 
   @Field({ nullable: true })
-  systemPrompt?: string; // Добавляем systemPrompt
+  systemPrompt?: string;
 
-  @Field(() => [Message])
-  messages: Message[];
+  @Field(() => [Message], { nullable: true })
+  messages?: Message[];
 }
 
 @Resolver(() => Chat)
@@ -107,8 +107,10 @@ export class ChatsResolver {
       id: entity.id,
       title: entity.title,
       timestamp: entity.timestamp,
-      systemPrompt: entity.systemPrompt, // Добавляем systemPrompt
-      messages: entity.messages.map(this.mapMessageEntityToMessage),
+      systemPrompt: entity.systemPrompt,
+      messages: entity.messages
+        ? entity.messages.map(this.mapMessageEntityToMessage)
+        : [],
     };
   };
 
@@ -116,18 +118,32 @@ export class ChatsResolver {
   async getChats(): Promise<Chat[]> {
     const chatEntities = await this.chatRepository
       .createQueryBuilder('chat')
-      .leftJoinAndSelect('chat.messages', 'message')
       .orderBy('chat.timestamp', 'DESC')
-      .addOrderBy('message.timestamp', 'ASC')
       .getMany();
     return chatEntities.map(this.mapChatEntityToChat);
+  }
+
+  @Query(() => [Message])
+  async getChatMessages(@Args('chatId') chatId: string): Promise<Message[]> {
+    const chatEntity = await this.chatRepository
+      .createQueryBuilder('chat')
+      .leftJoinAndSelect('chat.messages', 'message')
+      .where('chat.id = :chatId', { chatId })
+      .orderBy('message.timestamp', 'ASC')
+      .getOne();
+    if (!chatEntity) {
+      throw new Error(`Chat with id ${chatId} not found`);
+    }
+    return chatEntity.messages
+      ? chatEntity.messages.map(this.mapMessageEntityToMessage)
+      : [];
   }
 
   @Mutation(() => Chat)
   async saveChat(@Args('chat') chat: ChatInput): Promise<Chat> {
     const chatEntity = this.chatRepository.create({
       ...chat,
-      systemPrompt: chat.systemPrompt, // Добавляем systemPrompt
+      systemPrompt: chat.systemPrompt,
       messages: chat.messages.map((msg) => ({
         ...msg,
         timestamp: msg.timestamp ?? Date.now(),

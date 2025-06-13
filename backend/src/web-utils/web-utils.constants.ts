@@ -19,7 +19,4 @@ export const EXCLUDED_CLASSES = [
   'news',
   'footer-links',
   'social',
-  '[style*="display: none"]',
-  '[hidden]',
-  '[type="hidden"]',
 ];
