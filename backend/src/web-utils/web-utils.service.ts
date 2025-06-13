@@ -1,4 +1,3 @@
-// src/web-utils/web-utils.service.ts
 import { Injectable, Logger } from '@nestjs/common';
 import puppeteer, { Browser, Page } from 'puppeteer';
 import * as cheerio from 'cheerio';
@@ -7,7 +6,12 @@ import { EXCLUDED_CLASSES, EXCLUDED_TAGS } from './web-utils.constants';
 @Injectable()
 export class WebUtilsService {
   private readonly logger = new Logger(WebUtilsService.name);
+  private readonly EXCLUDE_SELECTOR = [
+    ...EXCLUDED_TAGS,
+    ...EXCLUDED_CLASSES.map((cls) => `.${cls}`),
+  ].join(',');
 
+  // Fetches and renders HTML content from a URL
   private async getRenderedHtml(
     url: string,
     retries: number = 2,
@@ -22,7 +26,6 @@ export class WebUtilsService {
       let browser: Browser | undefined;
       let page: Page | undefined;
       try {
-        this.logger.debug(`Попытка ${attempt} рендеринга ${url}`);
         browser = await puppeteer.launch({
           headless: true,
           args: [
@@ -37,7 +40,6 @@ export class WebUtilsService {
         const userAgent =
           userAgents[Math.floor(Math.random() * userAgents.length)];
         await page.setUserAgent(userAgent);
-        this.logger.debug(`Используется User-Agent: ${userAgent}`);
 
         await page.setExtraHTTPHeaders({
           'Accept-Language': 'en-US,en;q=0.9',
@@ -47,19 +49,16 @@ export class WebUtilsService {
 
         page.on('console', (msg) => {
           if (msg.type() === 'error') {
-            this.logger.warn(`Ошибка JS на странице ${url}: ${msg.text()}`);
+            this.logger.warn(`JS error on page ${url}: ${msg.text()}`);
           }
         });
 
-        this.logger.debug(`Загрузка страницы ${url}`);
         const response = await page.goto(url, {
           waitUntil: 'networkidle0',
           timeout: 90000,
         });
         if (!response?.ok()) {
-          this.logger.warn(
-            `HTTP-статус загрузки ${url}: ${response?.status()}`,
-          );
+          this.logger.warn(`HTTP status for ${url}: ${response?.status()}`);
         }
 
         await page
@@ -71,31 +70,27 @@ export class WebUtilsService {
           )
           .catch(() => {
             this.logger.warn(
-              `Ключевые селекторы не найдены для ${url} на попытке ${attempt}`,
+              `Key selectors not found for ${url} on attempt ${attempt}`,
             );
           });
 
-        this.logger.debug(`Прокрутка страницы ${url}`);
         await page.evaluate(() =>
           window.scrollTo(0, document.body.scrollHeight),
         );
         await new Promise((resolve) => setTimeout(resolve, 5000));
 
         const html = await page.content();
-        this.logger.debug(
-          `Длина отрендеренного HTML для ${url}: ${html.length}`,
-        );
         if (html.length < 100) {
-          this.logger.warn(`HTML слишком короткий: ${html.slice(0, 100)}`);
+          this.logger.warn(`HTML too short: ${html.slice(0, 100)}`);
         }
         return html;
       } catch (error) {
         this.logger.error(
-          `Ошибка Puppeteer на попытке ${attempt} для ${url}: ${error.message}`,
+          `Puppeteer error on attempt ${attempt} for ${url}: ${error.message}`,
         );
         if (attempt === retries) {
           throw new Error(
-            `Не удалось отрендерить ${url} после ${retries} попыток: ${error.message}`,
+            `Failed to render ${url} after ${retries} attempts: ${error.message}`,
           );
         }
         await new Promise((resolve) => setTimeout(resolve, 2000 * attempt));
@@ -103,13 +98,13 @@ export class WebUtilsService {
         if (page) await page.close();
         if (browser) {
           await browser.close();
-          this.logger.debug(`Браузер закрыт для ${url}`);
         }
       }
     }
-    throw new Error('Неожиданная ошибка рендеринга');
+    throw new Error('Unexpected rendering error');
   }
 
+  // Extracts text from HTML elements recursively
   private extractText($: cheerio.CheerioAPI, element: any): string {
     const blockElements = [
       'section',
@@ -153,6 +148,7 @@ export class WebUtilsService {
     return text.trim();
   }
 
+  // Cleans text by normalizing whitespace and formatting
   public cleanText(text: string): string {
     if (!text) return '';
     return text
@@ -163,39 +159,20 @@ export class WebUtilsService {
       .trim();
   }
 
-  async parseHtmlContent(
-    url: string,
-    _html: string,
-    maxSize: number,
-  ): Promise<string> {
+  // Parses HTML content from a URL and extracts relevant text
+  async parseHtmlContent(url: string, maxSize: number): Promise<string> {
     try {
-      // Декодируем URL
       let decodedUrl = url;
       try {
         decodedUrl = decodeURIComponent(url);
-        this.logger.debug(`Декодированный URL: ${decodedUrl}`);
       } catch (e) {
-        this.logger.warn(`Не удалось декодировать URL: ${url}`);
+        this.logger.warn(`Failed to decode URL: ${url}`);
       }
 
-      this.logger.debug(`Начало парсинга ${decodedUrl} с maxSize=${maxSize}`);
-
       const html = await this.getRenderedHtml(decodedUrl);
-      this.logger.debug(`Длина полученного HTML: ${html.length}`);
-
       const $ = cheerio.load(html, { xmlMode: false });
 
-      const bodyContent = $('body').html()?.slice(0, 200) || '';
-      this.logger.debug(`Начало <body>: ${bodyContent}`);
-
-      const excludeSelector = [
-        ...EXCLUDED_TAGS,
-        ...EXCLUDED_CLASSES.map((cls) => `.${cls}`),
-        '[style*="display: none"]',
-        '[hidden]',
-      ].join(',');
-      $(excludeSelector).remove();
-      this.logger.debug(`Удалены элементы по селектору: ${excludeSelector}`);
+      $(this.EXCLUDE_SELECTOR).remove();
 
       const metaDescription = this.cleanText(
         $('meta[name="description"]').attr('content') || '',
@@ -203,8 +180,6 @@ export class WebUtilsService {
       const ogDescription = this.cleanText(
         $('meta[property="og:description"]').attr('content') || '',
       );
-      this.logger.debug(`Мета-описание: ${metaDescription.slice(0, 100)}`);
-      this.logger.debug(`OG-описание: ${ogDescription.slice(0, 100)}`);
 
       const contentBlocks: string[] = [];
       const processedTexts = new Set<string>();
@@ -213,48 +188,31 @@ export class WebUtilsService {
         .find('section, article, main, h1, h2, h3, ul, ol, a, p, div')
         .filter((_, el) => {
           const text = this.extractText($, el);
-          const isValid = text.length > 5;
-          if (!isValid) {
-            this.logger.debug(
-              `Игнорируется элемент с коротким текстом: ${text.slice(0, 50)}`,
-            );
-          }
-          return isValid;
+          return text.length > 5;
         });
 
-      this.logger.debug(
-        `Найдено ${containers.length} контейнеров для ${decodedUrl}`,
-      );
       containers.each((_, element) => {
         const text = this.cleanText(this.extractText($, element));
         if (text && !processedTexts.has(text)) {
           processedTexts.add(text);
           contentBlocks.push(text);
-          this.logger.debug(`Добавлен блок: ${text.slice(0, 100)}`);
         }
       });
 
       let content = contentBlocks.join('\n---\n').trim();
       if (!content) {
-        this.logger.warn(
-          `Контент не найден, использование мета-данных или текста body`,
-        );
         content =
           metaDescription ||
           ogDescription ||
           this.cleanText(this.extractText($, $('body'))) ||
           '';
-        this.logger.debug(`Запасной контент: ${content.slice(0, 100)}`);
       }
 
       if (!content) {
-        this.logger.warn(`Контент пуст, использование сырого текста body`);
-        content = this.cleanText($('body').text()) || 'Контент недоступен';
-        this.logger.debug(`Сырой текст body: ${content.slice(0, 100)}`);
+        content = this.cleanText($('body').text()) || 'Content unavailable';
       }
 
       if (content.length > maxSize) {
-        this.logger.debug(`Контент превышает maxSize (${maxSize}), обрезка`);
         content = content.slice(0, maxSize);
         const lastSpace = content.lastIndexOf(' ');
         if (lastSpace > maxSize * 0.8) {
@@ -262,14 +220,13 @@ export class WebUtilsService {
         }
       }
 
-      this.logger.debug(`Длина финального контента: ${content.length}`);
-      if (content === 'Контент недоступен') {
-        this.logger.error(`Итоговый контент недоступен для ${decodedUrl}`);
+      if (content === 'Content unavailable') {
+        this.logger.error(`Final content unavailable for ${decodedUrl}`);
       }
       return content;
     } catch (error) {
-      this.logger.error(`Ошибка парсинга ${url}: ${error.message}`);
-      return 'Контент недоступен';
+      this.logger.error(`Parsing error for ${url}: ${error.message}`);
+      return 'Content unavailable';
     }
   }
 }
