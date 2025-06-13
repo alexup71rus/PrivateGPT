@@ -14,7 +14,7 @@ import {
   waitForBackend,
 } from '@/api/chats';
 import { type OllamaModel, type OllamaTagsResponse } from '@/types/ollama.ts';
-import { type Attachment, AttachmentType, type Chat, type Message } from '@/types/chats.ts';
+import { type Attachment, AttachmentType, type Chat, type ChatMeta, type Message } from '@/types/chats.ts';
 import {
   createThrottledFunction,
   extractLinks,
@@ -64,8 +64,8 @@ export const useChatStore = defineStore('chat', {
     async syncActiveChat () {
       const chat = this.chats.find(chat => chat.id === this.activeChatId);
       if (chat) {
-        this.activeChat = { ...chat, messages: chat.messages || [] };
-        if (!chat.messages) {
+        this.activeChat = { ...chat, messages: chat.messages };
+        if (!chat.messages.length) {
           await this.fetchChatMessages(this.activeChatId);
         }
       } else {
@@ -86,7 +86,8 @@ export const useChatStore = defineStore('chat', {
       this.loading = true;
       try {
         await waitForBackend();
-        this.chats = (await loadChats()).map(chat => ({
+        const { items, pagination } = await loadChats();
+        this.chats = items.map(chat => ({
           ...chat,
           systemPrompt: chat.systemPrompt || null,
           messages: [],
@@ -102,10 +103,10 @@ export const useChatStore = defineStore('chat', {
     async fetchChatMessages (chatId: string) {
       this.loading = true;
       try {
-        const messages = await loadChatMessages(chatId);
+        const { items, pagination } = await loadChatMessages(chatId);
         const chat = this.chats.find(c => c.id === chatId);
         if (chat) {
-          chat.messages = messages;
+          chat.messages = items;
           this.syncActiveChat();
         }
       } catch (err) {
@@ -134,7 +135,7 @@ export const useChatStore = defineStore('chat', {
       }
     },
 
-    async persistChatMeta (meta: { id: string; title?: string; timestamp?: number; systemPrompt?: string | null }) {
+    async persistChatMeta (meta: ChatMeta) {
       try {
         await throttledSaveChatMeta(meta);
       } catch (error) {

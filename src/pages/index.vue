@@ -3,25 +3,27 @@
   import { useChatStore } from '@/stores/chat.ts';
   import { useChatScroll } from '@/composables/useChatScroll.ts';
   import { useAppStore } from '@/stores/app.ts';
-  import { useSettingsStore } from '@/stores/settings.ts';
+  import { throttle } from '@/utils/helpers.ts';
 
   const app = useAppStore();
   const chat = useChatStore();
-  const settings = useSettingsStore();
   const chatTitle = ref(chat.activeChat?.title ?? '');
   const messages = computed(() => chat.activeChat?.messages ?? []);
   const isLoading = computed(() =>
-    chat.activeChat?.messages[chat.activeChat.messages.length - 1]?.role === 'user' && chat.isSending
+    Array.isArray(chat.activeChat?.messages) && chat.activeChat.messages[chat.activeChat.messages.length - 1]?.role === 'user' && chat.isSending
   );
   const { chatMessagesRef, chatGap, isShowScrollDown, scrollDown, updateActiveChatId } = useChatScroll(messages, chat.activeChatId);
 
-  watch(() => chatTitle.value || '', (newTitle: string) => {
-    chat.renameChat(chat.activeChatId, newTitle);
-  });
 
-  watch(() => chat.activeChatId, (newId: string) => {
-    updateActiveChatId(newId);
-    chatTitle.value = chat.activeChat?.title ?? '';
+  const renameChat = throttle(() => {
+    chat.renameChat(chat.activeChatId, chatTitle.value);
+  }, 500);
+
+  watch(() => chat.activeChat?.id, (newId: string | undefined) => {
+    if (newId) {
+      updateActiveChatId(newId);
+      chatTitle.value = chat.activeChat?.title ?? '';
+    }
   });
 </script>
 
@@ -34,6 +36,7 @@
         hide-details="auto"
         label="Chat Title"
         variant="solo"
+        @input="renameChat"
       />
       <v-tooltip text="Link to project GitHub">
         <template #activator="{ props }">
@@ -214,7 +217,7 @@
     position: absolute;
     transform: translateX(-50%);
     left: 50%;
-    bottom: 120px;
+    bottom: 130px;
     color: white;
   }
 }

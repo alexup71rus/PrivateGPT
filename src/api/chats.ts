@@ -1,6 +1,16 @@
 import { getGraphQLClient, handleGraphQLError } from '@/utils/graphql';
 import { gql } from 'graphql-tag';
-import { AttachmentType, type Chat, type MemoryEntry, type Message } from '@/types/chats.ts';
+import {
+  AttachmentType,
+  type Chat,
+  type ChatMeta,
+  type GraphQLPaginatedResponse,
+  type LinkContent,
+  type MemoryEntry,
+  type Message,
+  type PaginatedResponse,
+  type SearchResultItem,
+} from '@/types/chats.ts';
 
 export async function waitForBackend (maxRetries = 10, delay = 1000) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -28,52 +38,80 @@ export async function checkBackendHealth () {
   await client.request(query);
 }
 
-export async function loadChats (): Promise<Chat[]> {
+export async function loadChats (pagination?: { page?: number; perPage?: number }): Promise<PaginatedResponse<Chat>> {
   try {
     const client = await getGraphQLClient();
     const query = gql`
-      query {
-        getChats {
-          id
-          title
-          timestamp
-          systemPrompt
+      query GetChats($pagination: PaginationInput) {
+        getChats(pagination: $pagination) {
+          items {
+            id
+            title
+            timestamp
+            systemPrompt
+          }
+          total
+          page
+          perPage
+          totalPages
         }
       }
     `;
-    const { getChats } = await client.request<{ getChats: Chat[] }>(query);
-    return (getChats || []).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    const { getChats } = await client.request<{ getChats: GraphQLPaginatedResponse<Chat> }>(query, { pagination });
+    return {
+      items: (getChats.items || []).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)),
+      pagination: {
+        total: getChats.total,
+        page: getChats.page,
+        perPage: getChats.perPage,
+        totalPages: getChats.totalPages,
+      },
+    };
   } catch (error) {
     handleGraphQLError(error);
-    return [];
+    return { items: [], pagination: { total: 0, page: 1, perPage: 0, totalPages: 0 } };
   }
 }
 
-export async function loadChatMessages (chatId: string): Promise<Message[]> {
+export async function loadChatMessages (chatId: string, pagination?: { page?: number; perPage?: number }): Promise<PaginatedResponse<Message>> {
   try {
     const client = await getGraphQLClient();
     const query = gql`
-      query GetChatMessages($chatId: String!) {
-        getChatMessages(chatId: $chatId) {
-          id
-          content
-          role
-          timestamp
-          attachmentMeta {
-            type
-            name
-            size
-            lastModified
+      query GetChatMessages($chatId: String!, $pagination: PaginationInput) {
+        getChatMessages(chatId: $chatId, pagination: $pagination) {
+          items {
+            id
+            content
+            role
+            timestamp
+            attachmentMeta {
+              type
+              name
+              size
+              lastModified
+            }
+            attachmentContent
           }
-          attachmentContent
+          total
+          page
+          perPage
+          totalPages
         }
       }
     `;
-    const { getChatMessages } = await client.request<{ getChatMessages: Message[] }>(query, { chatId });
-    return getChatMessages || [];
+    const { getChatMessages } = await client.request<{ getChatMessages: GraphQLPaginatedResponse<Message> }>(query, { chatId, pagination });
+    return {
+      items: getChatMessages.items || [],
+      pagination: {
+        total: getChatMessages.total,
+        page: getChatMessages.page,
+        perPage: getChatMessages.perPage,
+        totalPages: getChatMessages.totalPages,
+      },
+    };
   } catch (error) {
     handleGraphQLError(error);
-    return [];
+    return { items: [], pagination: { total: 0, page: 1, perPage: 0, totalPages: 0 } };
   }
 }
 
@@ -113,7 +151,7 @@ export async function saveChat (chat: Chat): Promise<void> {
   }
 }
 
-export async function saveChatMeta (meta: { id: string; title?: string; timestamp?: number; systemPrompt?: string | null }): Promise<void> {
+export async function saveChatMeta (meta: ChatMeta): Promise<void> {
   try {
     const client = await getGraphQLClient();
     const mutation = gql`
@@ -229,13 +267,6 @@ export async function deleteMemoryEntry (id: number): Promise<void> {
   }
 }
 
-interface SearchResultItem {
-  title: string;
-  url: string;
-  description: string;
-  content?: string;
-}
-
 export async function searchBackend (
   query: string,
   url: string,
@@ -266,11 +297,6 @@ export async function searchBackend (
     handleGraphQLError(error);
     return null;
   }
-}
-
-interface LinkContent {
-  content: string;
-  error?: string;
 }
 
 export async function fetchLinkContent (urls: string[]): Promise<LinkContent> {

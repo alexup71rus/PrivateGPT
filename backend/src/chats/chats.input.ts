@@ -49,7 +49,7 @@ export class ChatInput {
   timestamp: number;
 
   @Field({ nullable: true })
-  systemPrompt?: string; // Добавляем systemPrompt
+  systemPrompt?: string;
 
   @Field(() => [MessageInput])
   messages: MessageInput[];
@@ -68,4 +68,13 @@ export class ChatMetaInput {
 
   @Field({ nullable: true })
   systemPrompt?: string;
+}
+
+@InputType()
+export class PaginationInput {
+  @Field(() => Int, { nullable: true })
+  page?: number;
+
+  @Field(() => Int, { nullable: true })
+  perPage?: number;
 }
