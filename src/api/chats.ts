@@ -1,14 +1,11 @@
 import { getGraphQLClient, handleGraphQLError } from '@/utils/graphql';
 import { gql } from 'graphql-tag';
 import {
-  AttachmentType,
   type Chat,
   type ChatMeta,
-  type GraphQLPaginatedResponse,
   type LinkContent,
   type MemoryEntry,
   type Message,
-  type PaginatedResponse,
   type SearchResultItem,
 } from '@/types/chats.ts';
 
@@ -21,7 +18,6 @@ export async function waitForBackend (maxRetries = 10, delay = 1000) {
       if (attempt === maxRetries) {
         throw new Error('Backend is not available after maximum retries');
       }
-
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
@@ -34,84 +30,55 @@ export async function checkBackendHealth () {
       healthCheck
     }
   `;
-
   await client.request(query);
 }
 
-export async function loadChats (pagination?: { page?: number; perPage?: number }): Promise<PaginatedResponse<Chat>> {
+export async function loadChats (): Promise<Chat[]> {
   try {
     const client = await getGraphQLClient();
     const query = gql`
-      query GetChats($pagination: PaginationInput) {
-        getChats(pagination: $pagination) {
-          items {
-            id
-            title
-            timestamp
-            systemPrompt
-          }
-          total
-          page
-          perPage
-          totalPages
+      query GetChats {
+        getChats {
+          id
+          title
+          timestamp
+          systemPrompt
         }
       }
     `;
-    const { getChats } = await client.request<{ getChats: GraphQLPaginatedResponse<Chat> }>(query, { pagination });
-    return {
-      items: (getChats.items || []).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)),
-      pagination: {
-        total: getChats.total,
-        page: getChats.page,
-        perPage: getChats.perPage,
-        totalPages: getChats.totalPages,
-      },
-    };
+    const { getChats } = await client.request<{ getChats: Chat[] }>(query);
+    return (getChats || []).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
   } catch (error) {
     handleGraphQLError(error);
-    return { items: [], pagination: { total: 0, page: 1, perPage: 0, totalPages: 0 } };
+    return [];
   }
 }
 
-export async function loadChatMessages (chatId: string, pagination?: { page?: number; perPage?: number }): Promise<PaginatedResponse<Message>> {
+export async function loadChatMessages (chatId: string): Promise<Message[]> {
   try {
     const client = await getGraphQLClient();
     const query = gql`
-      query GetChatMessages($chatId: String!, $pagination: PaginationInput) {
-        getChatMessages(chatId: $chatId, pagination: $pagination) {
-          items {
-            id
-            content
-            role
-            timestamp
-            attachmentMeta {
-              type
-              name
-              size
-              lastModified
-            }
-            attachmentContent
+      query GetChatMessages($chatId: String!) {
+        getChatMessages(chatId: $chatId) {
+          id
+          content
+          role
+          timestamp
+          attachmentMeta {
+            type
+            name
+            size
+            lastModified
           }
-          total
-          page
-          perPage
-          totalPages
+          attachmentContent
         }
       }
     `;
-    const { getChatMessages } = await client.request<{ getChatMessages: GraphQLPaginatedResponse<Message> }>(query, { chatId, pagination });
-    return {
-      items: getChatMessages.items || [],
-      pagination: {
-        total: getChatMessages.total,
-        page: getChatMessages.page,
-        perPage: getChatMessages.perPage,
-        totalPages: getChatMessages.totalPages,
-      },
-    };
+    const { getChatMessages } = await client.request<{ getChatMessages: Message[] }>(query, { chatId });
+    return getChatMessages || [];
   } catch (error) {
     handleGraphQLError(error);
-    return { items: [], pagination: { total: 0, page: 1, perPage: 0, totalPages: 0 } };
+    return [];
   }
 }
 
@@ -125,7 +92,7 @@ export async function saveChat (chat: Chat): Promise<void> {
         }
       }
     `;
-    const serializableChat = JSON.parse(JSON.stringify({
+    const serializableChat = {
       id: chat.id,
       title: chat.title,
       timestamp: chat.timestamp,
@@ -136,7 +103,7 @@ export async function saveChat (chat: Chat): Promise<void> {
         timestamp: message.timestamp,
         attachmentMeta: message.attachmentMeta
           ? {
-            type: message.attachmentMeta.type === AttachmentType.TEXT ? AttachmentType.TEXT : AttachmentType.IMAGE,
+            type: message.attachmentMeta.type,
             name: message.attachmentMeta.name,
             size: message.attachmentMeta.size,
             lastModified: message.attachmentMeta.lastModified,
@@ -144,7 +111,7 @@ export async function saveChat (chat: Chat): Promise<void> {
           : null,
         attachmentContent: message.attachmentContent || null,
       })),
-    }));
+    };
     await client.request(mutation, { chat: serializableChat });
   } catch (error) {
     handleGraphQLError(error);
@@ -161,12 +128,12 @@ export async function saveChatMeta (meta: ChatMeta): Promise<void> {
         }
       }
     `;
-    const serializableMeta = JSON.parse(JSON.stringify({
+    const serializableMeta = {
       id: meta.id,
       title: meta.title ?? undefined,
       timestamp: meta.timestamp ?? undefined,
       systemPrompt: meta.systemPrompt ?? undefined,
-    }));
+    };
     await client.request(mutation, { meta: serializableMeta });
   } catch (error) {
     handleGraphQLError(error);
@@ -290,7 +257,6 @@ export async function searchBackend (
       limit: options?.searchResultsLimit,
       followLinks: options?.followSearchLinks,
     });
-
     return search.results ? JSON.parse(search.results) as SearchResultItem[] : null;
   } catch (error) {
     console.error('searchBackend error:', error);
@@ -312,6 +278,7 @@ export async function fetchLinkContent (urls: string[]): Promise<LinkContent> {
     `;
     const encodedUrls = urls.map(url => encodeURIComponent(url));
     const { fetchLinkContent } = await client.request<{ fetchLinkContent: LinkContent }>(gqlQuery, { urls: encodedUrls });
+
     return fetchLinkContent;
   } catch (error) {
     console.error('fetchLinkContent error:', error);
@@ -330,21 +297,21 @@ export async function saveMessage (chatId: string, message: Message): Promise<vo
         }
       }
     `;
-    const serializableMessage = JSON.parse(JSON.stringify({
+    const serializableMessage = {
       id: message.id,
       content: message.content,
       role: message.role,
       timestamp: message.timestamp,
       attachmentMeta: message.attachmentMeta
         ? {
-          type: message.attachmentMeta.type === AttachmentType.TEXT ? AttachmentType.TEXT : AttachmentType.IMAGE,
+          type: message.attachmentMeta.type,
           name: message.attachmentMeta.name,
           size: message.attachmentMeta.size,
           lastModified: message.attachmentMeta.lastModified,
         }
         : null,
       attachmentContent: message.attachmentContent || null,
-    }));
+    };
     await client.request(mutation, { chatId, message: serializableMessage });
   } catch (error) {
     handleGraphQLError(error);
@@ -360,6 +327,37 @@ export async function deleteMessage (chatId: string, messageIds: string[]): Prom
       }
     `;
     await client.request(mutation, { chatId, messageIds });
+  } catch (error) {
+    handleGraphQLError(error);
+  }
+}
+
+export async function replaceChatMessages (chatId: string, messages: Message[]): Promise<void> {
+  try {
+    const client = await getGraphQLClient();
+    const mutation = gql`
+      mutation ReplaceChatMessages($chatId: String!, $messages: [MessageInput!]!) {
+        replaceChatMessages(chatId: $chatId, messages: $messages) {
+          id
+        }
+      }
+    `;
+    const serializableMessages = messages.map(message => ({
+      id: message.id,
+      content: message.content,
+      role: message.role,
+      timestamp: message.timestamp,
+      attachmentMeta: message.attachmentMeta
+        ? {
+          type: message.attachmentMeta.type,
+          name: message.attachmentMeta.name,
+          size: message.attachmentMeta.size,
+          lastModified: message.attachmentMeta.lastModified,
+        }
+        : null,
+      attachmentContent: message.attachmentContent || null,
+    }));
+    await client.request(mutation, { chatId, messages: serializableMessages });
   } catch (error) {
     handleGraphQLError(error);
   }

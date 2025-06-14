@@ -45,12 +45,34 @@ export class ChatsService {
     return this.messageRepository.save(messageEntity);
   }
 
+  async replaceChatMessages(
+    chatId: string,
+    messages: MessageInput[],
+  ): Promise<ChatEntity> {
+    const chat = await this.chatRepository.findOne({
+      where: { id: chatId },
+      relations: ['messages'],
+    });
+    if (!chat) {
+      throw new Error(`Chat with id ${chatId} not found`);
+    }
+    await this.messageRepository.delete({ chat: { id: chatId } });
+    const messageEntities = messages.map((msg) =>
+      this.messageRepository.create({
+        ...msg,
+        timestamp: msg.timestamp ?? Date.now(),
+        chat: { id: chatId },
+      }),
+    );
+    chat.messages = await this.messageRepository.save(messageEntities);
+    return this.chatRepository.save(chat);
+  }
+
   async deleteMessage(chatId: string, messageIds: string[]): Promise<boolean> {
     const chat = await this.chatRepository.findOne({ where: { id: chatId } });
     if (!chat) {
       throw new Error(`Chat with id ${chatId} not found`);
     }
-
     const result = await this.messageRepository.delete({
       id: In(messageIds),
       chat: { id: chatId },

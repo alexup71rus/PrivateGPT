@@ -14,12 +14,7 @@ import { Repository } from 'typeorm';
 import { ChatEntity } from './chat.entity';
 import { MessageEntity } from './message.entity';
 import { ChatsService } from './chats.service';
-import {
-  ChatInput,
-  ChatMetaInput,
-  MessageInput,
-  PaginationInput,
-} from './chats.input';
+import { ChatInput, ChatMetaInput, MessageInput } from './chats.input';
 
 export enum AttachmentType {
   TEXT = 'TEXT',
@@ -81,42 +76,6 @@ class Chat {
   messages?: Message[];
 }
 
-@ObjectType()
-class PaginatedChats {
-  @Field(() => [Chat])
-  items: Chat[];
-
-  @Field(() => Int)
-  total: number;
-
-  @Field(() => Int)
-  page: number;
-
-  @Field(() => Int)
-  perPage: number;
-
-  @Field(() => Int)
-  totalPages: number;
-}
-
-@ObjectType()
-class PaginatedMessages {
-  @Field(() => [Message])
-  items: Message[];
-
-  @Field(() => Int)
-  total: number;
-
-  @Field(() => Int)
-  page: number;
-
-  @Field(() => Int)
-  perPage: number;
-
-  @Field(() => Int)
-  totalPages: number;
-}
-
 @Resolver(() => Chat)
 export class ChatsResolver {
   constructor(
@@ -155,71 +114,29 @@ export class ChatsResolver {
     };
   };
 
-  @Query(() => PaginatedChats)
-  async getChats(
-    @Args('pagination', { type: () => PaginationInput, nullable: true })
-    pagination?: PaginationInput,
-  ): Promise<PaginatedChats> {
-    const query = this.chatRepository
+  @Query(() => [Chat])
+  async getChats(): Promise<Chat[]> {
+    const chatEntities = await this.chatRepository
       .createQueryBuilder('chat')
-      .orderBy('chat.timestamp', 'DESC');
-
-    const total = await query.getCount();
-    let page = pagination?.page ?? 1;
-    const perPage =
-      pagination?.perPage && pagination.perPage > 0 ? pagination.perPage : 10;
-
-    if (pagination?.page || pagination?.perPage) {
-      page = pagination?.page ?? 1;
-      query.skip((page - 1) * perPage).take(perPage);
-    }
-
-    const chatEntities = await query.getMany();
-    const totalPages = total === 0 ? 0 : Math.ceil(total / perPage);
-
-    return {
-      items: chatEntities.map(this.mapChatEntityToChat),
-      total,
-      page,
-      perPage,
-      totalPages,
-    };
+      .orderBy('chat.timestamp', 'DESC')
+      .getMany();
+    return chatEntities.map(this.mapChatEntityToChat);
   }
 
-  @Query(() => PaginatedMessages)
-  async getChatMessages(
-    @Args('chatId') chatId: string,
-    @Args('pagination', { type: () => PaginationInput, nullable: true })
-    pagination?: PaginationInput,
-  ): Promise<PaginatedMessages> {
-    const query = this.chatRepository
+  @Query(() => [Message])
+  async getChatMessages(@Args('chatId') chatId: string): Promise<Message[]> {
+    const chatEntity = await this.chatRepository
       .createQueryBuilder('chat')
       .leftJoinAndSelect('chat.messages', 'message')
       .where('chat.id = :chatId', { chatId })
-      .orderBy('message.timestamp', 'ASC');
-
-    const chatEntity = await query.getOne();
+      .orderBy('message.timestamp', 'ASC')
+      .getOne();
     if (!chatEntity) {
       throw new Error(`Chat with id ${chatId} not found`);
     }
-
-    const total = chatEntity.messages?.length ?? 0;
-    const page = pagination?.page ?? 1;
-    const perPage =
-      pagination?.perPage && pagination.perPage > 0 ? pagination.perPage : 10;
-
-    const messages = chatEntity.messages
-      ? chatEntity.messages.slice((page - 1) * perPage, page * perPage)
+    return chatEntity.messages
+      ? chatEntity.messages.map(this.mapMessageEntityToMessage)
       : [];
-    const totalPages = total === 0 ? 0 : Math.ceil(total / perPage);
-
-    return {
-      items: messages.map(this.mapMessageEntityToMessage),
-      total,
-      page,
-      perPage,
-      totalPages,
-    };
   }
 
   @Mutation(() => Chat)
@@ -257,6 +174,18 @@ export class ChatsResolver {
   ): Promise<Message> {
     const savedMessage = await this.chatsService.saveMessage(chatId, message);
     return this.mapMessageEntityToMessage(savedMessage);
+  }
+
+  @Mutation(() => Chat)
+  async replaceChatMessages(
+    @Args('chatId') chatId: string,
+    @Args('messages', { type: () => [MessageInput] }) messages: MessageInput[],
+  ): Promise<Chat> {
+    const updatedChat = await this.chatsService.replaceChatMessages(
+      chatId,
+      messages,
+    );
+    return this.mapChatEntityToChat(updatedChat);
   }
 
   @Mutation(() => Boolean)

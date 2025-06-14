@@ -1,6 +1,5 @@
 import { type Attachment, AttachmentType } from '@/types/chats.ts';
-import type { SearchResultItem } from '../../backend/src/search/search.service.ts';
-import { formatFileSize } from '@/utils/chatUtils.ts';
+import type { ISettings } from '@/types/settings.ts';
 
 export function buildOllamaRequestBody (
   chat: { systemPrompt?: { content: string } | null; messages: any[] },
@@ -9,50 +8,83 @@ export function buildOllamaRequestBody (
   finalContent: string,
   attachmentContent: Attachment | null | undefined,
   memoryContent: string | null | undefined,
-  searchResults: SearchResultItem[] | null,
-  linkContent: { urls: string[]; content?: string; error?: string } | null,
-  textFileContent: { content: string; meta: { name: string; size: number } } | null,
+  tempMessages: { role: 'system'; content: string }[], // Временные сообщения
+  isSearchActive: boolean,
+  settings: ISettings
 ) {
   const hasAttachment = !!(attachmentContent && Object.keys(attachmentContent).length);
-  let images: string[] | undefined;
 
-  const body = hasAttachment && attachmentContent!.type === AttachmentType.IMAGE
-    ? { model: selectedModel, prompt: finalContent, images: [attachmentContent!.content], stream: true }
-    : {
-      model: selectedModel,
-      messages: (() => {
-        const messages: any[] = [];
-        if (chat.systemPrompt) {
-          messages.push({ role: 'system', content: chat.systemPrompt.content });
-        }
-        if (memoryContent) {
-          messages.push({ role: 'system', content: memoryContent });
-        }
-        chat.messages.forEach(msg => {
-          if (msg.id === userMessageId) {
-            if (searchResults) {
-              messages.push({ role: 'system', content: JSON.stringify(searchResults) });
-            }
-            if (linkContent) {
-              messages.push({ role: 'system', content: JSON.stringify(linkContent) });
-            }
-            if (textFileContent && msg.attachmentMeta?.type === AttachmentType.TEXT) {
-              messages.push({
-                role: 'system',
-                content: `[Attached: ${textFileContent.meta.name} [${formatFileSize(textFileContent.meta.size)}]]\n${textFileContent.content}`,
-              });
-            }
-          }
-          const message = {
-            role: msg.role,
-            content: msg.content,
-          };
-          messages.push(message);
-        });
-        return messages;
-      })(),
-      stream: true,
+  if (!chat || !chat.messages) {
+    throw new Error('Invalid chat object');
+  }
+
+  if (!selectedModel) {
+    throw new Error('No model selected');
+  }
+
+  if (!userMessageId) {
+    throw new Error('Invalid user message ID');
+  }
+
+  const maxMessages = settings.maxMessages || 20;
+  const reservedSlots = (chat.systemPrompt?.content || memoryContent ? 1 : 0) + tempMessages.length + 1;
+  const availableSlots = Math.max(0, maxMessages - reservedSlots);
+
+  if (hasAttachment && attachmentContent!.type === AttachmentType.IMAGE) {
+    if (!attachmentContent!.content) {
+      throw new Error('Invalid image attachment content');
+    }
+    return {
+      body: {
+        model: selectedModel,
+        prompt: [
+          chat.systemPrompt?.content,
+          memoryContent,
+          finalContent,
+        ].filter(Boolean).join('\n'),
+        images: [attachmentContent!.content],
+        stream: true,
+      },
+      images: [attachmentContent!.content],
     };
+  }
 
-  return { body, images };
+  const systemContent = [chat.systemPrompt?.content, memoryContent].filter(Boolean).join('\n');
+
+  const messages: any[] = [];
+  if (systemContent) {
+    messages.push({ role: 'system', content: systemContent });
+  }
+
+  const userMessageExists = chat.messages.some(msg => msg.id === userMessageId);
+  if (!userMessageExists) {
+    throw new Error('User message not found in chat');
+  }
+
+  const filteredMessages = chat.messages
+    .filter(msg => msg.id !== userMessageId && msg.role !== 'system')
+    .slice(-availableSlots)
+    .map(msg => ({
+      role: msg.role,
+      content: msg.content,
+    }));
+
+  messages.push(...filteredMessages);
+
+  if (tempMessages.length) {
+    messages.push(...tempMessages);
+  }
+  messages.push({
+    role: 'user',
+    content: finalContent || '',
+  });
+
+  return {
+    body: {
+      model: selectedModel,
+      messages,
+      stream: true,
+    },
+    images: undefined,
+  };
 }

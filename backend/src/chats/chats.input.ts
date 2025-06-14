@@ -69,12 +69,3 @@ export class ChatMetaInput {
   @Field({ nullable: true })
   systemPrompt?: string;
 }
-
-@InputType()
-export class PaginationInput {
-  @Field(() => Int, { nullable: true })
-  page?: number;
-
-  @Field(() => Int, { nullable: true })
-  perPage?: number;
-}

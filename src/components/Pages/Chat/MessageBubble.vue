@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-  import type { Attachment, AttachmentMeta, Message } from '@/types/chats';
+  import type { Message } from '@/types/chats';
   import { useChatStore } from '@/stores/chat';
   import { useAlert } from '@/plugins/alertPlugin';
   import { computed, onMounted, ref } from 'vue';
@@ -26,7 +26,7 @@
   useCopyCode(bubbleRef, showSnackbar);
 
   const parsedContent = computed(() => {
-    return parseMarkdown(props.message.content)
+    return parseMarkdown(props.message.content);
   });
 
   const copyCodeBlock = async (code: string) => {
@@ -45,52 +45,14 @@
       return;
     }
 
-    await chat.editMessage(chat.activeChatId, props.message.id, editedContent.value);
-    showSnackbar({ message: 'Message updated', type: 'success' });
-
-    if (!makeResend) {
+    try {
       isEditDialogOpen.value = false;
-      return;
+      await chat.editMessage(chat.activeChatId, props.message.id, editedContent.value, makeResend && props.message.role === 'user');
+      showSnackbar({ message: 'Message updated', type: 'success' });
+    } catch (error) {
+      showSnackbar({ message: 'Failed to update message', type: 'error' });
+      console.error('saveEditedMessage error:', error);
     }
-
-    const _chat = chat.activeChat;
-    if (!_chat) return;
-
-    const index = _chat.messages.findIndex(m => m.id === props.message.id);
-    if (index < 0) return;
-
-    _chat.messages = _chat.messages.slice(0, index);
-    await chat.persistChat(_chat.id);
-
-    chat.setIsSending(true);
-
-    if (props.message.role === 'user') {
-      await chat.sendMessage(
-        chat.activeChatId,
-        editedContent.value,
-        props.message.attachmentContent
-          ? { content: props.message.attachmentContent, type: props.message.attachmentMeta?.type || 'TEXT', meta: props.message.attachmentMeta as AttachmentMeta } as Attachment
-          : null,
-        memory.getMemoryContent
-      );
-    } else {
-      if (index === 0) return;
-
-      const prevMessage = _chat.messages[index - 1];
-      if (prevMessage.role !== 'user') return;
-
-      await chat.sendMessage(
-        chat.activeChatId,
-        prevMessage.content,
-        prevMessage.attachmentContent
-          ? { content: prevMessage.attachmentContent, type: prevMessage.attachmentMeta?.type || 'TEXT', meta: prevMessage.attachmentMeta as AttachmentMeta } as Attachment
-          : null,
-        memory.getMemoryContent
-      );
-    }
-
-    chat.setIsSending(false);
-    isEditDialogOpen.value = false;
   };
 
   const closeEditDialog = () => {
@@ -115,22 +77,33 @@
     });
   });
 
-  const deleteMessage = () => {
+  const deleteMessage = async () => {
     const chatId = chat.activeChatId;
-    if (chatId) chat.deleteMessage(chatId, props.message.id);
+    if (!chatId) return;
+
+    try {
+      await chat.deleteMessage(chatId, props.message.id);
+      showSnackbar({ message: 'Message deleted', type: 'success' });
+    } catch (error) {
+      showSnackbar({ message: 'Failed to delete message', type: 'error' });
+      console.error('deleteMessage error:', error);
+    }
   };
 
   const regenerateMessage = async () => {
     const _chat = chat.activeChat;
     if (!_chat) return;
-    const index = _chat.messages.findIndex(m => m.id === props.message.id);
-    if (index <= 0) return;
-    const prev = _chat.messages[index - 1];
-    if (prev.role !== 'user') return;
 
-    chat.setIsSending(true);
-    await chat.regenerateMessage(_chat.id, props.message.id);
-    chat.setIsSending(false);
+    try {
+      chat.setIsSending(true);
+      await chat.regenerateMessage(_chat.id, props.message.id);
+      showSnackbar({ message: 'Message regenerated', type: 'success' });
+    } catch (error) {
+      showSnackbar({ message: 'Failed to regenerate message', type: 'error' });
+      console.error('regenerateMessage error:', error);
+    } finally {
+      chat.setIsSending(false);
+    }
   };
 
   const saveSummary = async () => {
@@ -192,6 +165,7 @@
       });
     } catch (error) {
       showSnackbar({ message: 'Error processing summary', type: 'error' });
+      console.error('saveSummary error:', error);
     } finally {
       isSummaryLoading.value = false;
     }

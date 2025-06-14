@@ -12,12 +12,13 @@
   const formSettings = ref<Partial<ISettings>>({
     theme: settingsStore.settings.theme,
     ollamaURL: settingsStore.settings.ollamaURL,
-    systemModel: settingsStore.settings.systemModel,
+    systemModel: settingsStore.settings.systemModel || '',
     titlePrompt: settingsStore.settings.titlePrompt,
     defaultChatTitle: settingsStore.settings.defaultChatTitle,
     chatScrollMode: settingsStore.settings.chatScrollMode || 'scroll',
     systemPrompts: [...settingsStore.settings.systemPrompts],
     defaultSystemPrompt: settingsStore.settings.defaultSystemPrompt,
+    maxMessages: settingsStore.settings.maxMessages,
   });
 
   const newPrompt = ref('');
@@ -25,16 +26,18 @@
   const editingPromptIndex = ref<number | null>(null);
 
   const availableModels = computed(() => [
-    { name: 'Use selected model', id: '' },
-    ...(chatStore.models || []).map(model => ({ name: model.name, id: model.id })),
+    { name: 'Use selected model', details: '', size: '', value: '' },
+    ...(chatStore.models || []).map(model => ({ name: model.name, details: model.details, size: model.size, value: model.name })),
   ]);
+
   const connectionStatus = computed(() => chatStore.connectionStatus);
 
   const isFormValid = computed(() => {
     return (
       formSettings.value.ollamaURL?.trim() !== '' &&
       /^https?:\/\/[^\s/$.?#].[^\s]*$/.test(formSettings.value.ollamaURL || '') &&
-      formSettings.value.defaultChatTitle?.trim() !== ''
+      formSettings.value.defaultChatTitle?.trim() !== '' &&
+      formSettings.value.maxMessages !== undefined
     );
   });
 
@@ -73,6 +76,7 @@
       chatScrollMode: DEFAULT_SETTINGS.chatScrollMode || 'scroll',
       systemPrompts: [...DEFAULT_SETTINGS.systemPrompts],
       defaultSystemPrompt: DEFAULT_SETTINGS.defaultSystemPrompt,
+      maxMessages: DEFAULT_SETTINGS.maxMessages,
     };
     settingsStore.resetSettings();
     showSnackbar({ message: 'General settings reset', type: 'success' });
@@ -86,7 +90,7 @@
     const prompts = [...(formSettings.value.systemPrompts || [])];
     const prompt: SystemPrompt = { title: newPromptTitle.value, content: newPrompt.value };
     if (editingPromptIndex.value !== null) {
-      prompts[editingPromptIndex.value - 1] = prompt; // Adjust for No default
+      prompts[editingPromptIndex.value - 1] = prompt;
       if (formSettings.value.defaultSystemPrompt?.title === prompts[editingPromptIndex.value - 1].title) {
         formSettings.value.defaultSystemPrompt = prompt;
       }
@@ -124,7 +128,7 @@
       return;
     }
     const prompts = [...(formSettings.value.systemPrompts || [])];
-    const deletedPrompt = prompts[index - 1]; // Adjust for No default
+    const deletedPrompt = prompts[index - 1];
     prompts.splice(index - 1, 1);
     if (formSettings.value.defaultSystemPrompt?.title === deletedPrompt?.title) {
       formSettings.value.defaultSystemPrompt = null;
@@ -173,6 +177,14 @@
         variant="solo-filled"
       />
 
+      <v-select
+        v-model="formSettings.maxMessages"
+        class="mb-4"
+        :items="[5, 10, 20, 50, 100]"
+        label="Max Messages for Neural Network"
+        variant="solo-filled"
+      />
+
       <v-divider class="mb-10" />
 
       <v-text-field
@@ -192,12 +204,13 @@
           </v-icon>
         </template>
       </v-text-field>
+
       <v-select
         v-model="formSettings.systemModel"
         class="mb-4"
         :disabled="!availableModels.length"
         item-title="name"
-        item-value="id"
+        item-value="value"
         :items="availableModels"
         label="General model (for features)"
         :loading="connectionStatus === 'checking'"

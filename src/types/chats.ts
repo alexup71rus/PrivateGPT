@@ -50,11 +50,8 @@ export interface ChatModel {
 }
 
 export interface LinkContent {
-  url: string;
-  title?: string;
-  description?: string;
-  content?: string;
-  error?: string;
+  content: string;
+  error: string;
 }
 
 export interface SearchResultItem {
@@ -69,24 +66,4 @@ export interface ChatMeta {
   title?: string;
   timestamp?: number;
   systemPrompt?: string | null;
-}
-
-export interface Pagination {
-  total: number;
-  page: number;
-  perPage: number;
-  totalPages: number;
-}
-
-export interface PaginatedResponse<T> {
-  items: T[];
-  pagination: Pagination;
-}
-
-export interface GraphQLPaginatedResponse<T> {
-  items: T[];
-  total: number;
-  page: number;
-  perPage: number;
-  totalPages: number;
 }

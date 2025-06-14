@@ -121,7 +121,6 @@
         activeChatId.value,
         messageText.value,
         { ...attachmentContent.value } as Attachment,
-        memory.getMemoryContent
       );
       messageText.value = '';
       attachment.value = null;
@@ -159,7 +158,8 @@
 
   onMounted(() => {
     nextTick(() => textareaRef.value?.focus());
-    if (isChatEmpty.value && !activeChat.value?.systemPrompt) {
+    if (isChatEmpty.value && !activeChat.value?.systemPrompt && settingsStore.settings.defaultSystemPrompt) {
+      chat.setSystemPrompt(activeChatId.value, settingsStore.settings.defaultSystemPrompt);
       selectedPrompt.value = settingsStore.settings.defaultSystemPrompt;
       promptSearch.value = selectedPrompt.value?.title || '';
     }

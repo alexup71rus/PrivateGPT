@@ -1,5 +1,6 @@
 export type Theme = 'light' | 'dark' | 'system';
 export type SearchFormat = 'html' | 'json';
+export type MaxMessages = 5 | 10 | 20 | 50 | 100;
 
 export type SystemPrompt = {
   title: string;
@@ -22,7 +23,7 @@ export const DEFAULT_SETTINGS = {
   systemPrompts: [
     { title: 'Default Assistant', content: 'You are a helpful assistant' },
   ] as SystemPrompt[],
-  defaultSystemPrompt: null as SystemPrompt | null,
+  defaultSystemPrompt: { title: 'Default Assistant', content: 'You are a helpful assistant' } as SystemPrompt,
   systemModel: '' as string,
   titlePrompt: 'Generate a concise chat title (2-5 words, up to 50 characters) summarizing the topic based on the provided messages. Use the same language as the user’s message. Include a relevant emoji only if it enhances clarity. Return the title as plain text. Examples:\n' +
     '- English: "🐍 Python Snake Game" for user: "Write a snake game in Python"\n' +
@@ -42,6 +43,7 @@ export const DEFAULT_SETTINGS = {
     '- French: "plan voyage Paris" for user: "Plan a trip to Paris"' as string,
   searchResultsLimit: 3 as number,
   followSearchLinks: false as boolean,
+  maxMessages: 20 as MaxMessages,
 } as const;
 
 export type ISettings = {
