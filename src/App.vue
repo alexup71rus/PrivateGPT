@@ -22,12 +22,16 @@
   onMounted(async () => {
     await chat.checkOllamaConnection();
     await waitForBackend();
-    await Promise.all([chat.fetchModels(), chat.fetchChats(), memory.fetchMemory()]);
+    await chat.fetchModels();
+    await memory.fetchMemory();
+    await settingsStore.init();
 
     if (chat.error || window.location.pathname !== '/') {
+      isLoaded.value = true;
       return;
     }
 
+    await chat.fetchChats();
     await nextTick();
     await initFromHash();
     if (chat.activeChatId) {

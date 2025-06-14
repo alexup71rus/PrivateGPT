@@ -44,7 +44,10 @@ export const DEFAULT_SETTINGS = {
   searchResultsLimit: 3 as number,
   followSearchLinks: false as boolean,
   maxMessages: 20 as MaxMessages,
-} as const;
+  embeddingsModel: '' as string,
+  ragFiles: [] as string[],
+  selectedRagFiles: [] as string[],
+};
 
 export type ISettings = {
   [K in keyof typeof DEFAULT_SETTINGS]: typeof DEFAULT_SETTINGS[K];

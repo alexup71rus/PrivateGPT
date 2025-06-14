@@ -18,6 +18,8 @@
   const attachmentContent = ref<AttachmentContent | null>(null);
   const promptMenu = ref(false);
   const promptSearch = ref('');
+  const ragMenu = ref(false);
+  const ragSearch = ref('');
 
   const activeChat = computed(() => chat.activeChat);
   const activeChatId = computed(() => chat.activeChatId);
@@ -30,6 +32,14 @@
     modelSearch.value
       ? modelNames.value.filter(name => name.toLowerCase().includes(modelSearch.value.toLowerCase()))
       : modelNames.value
+  );
+  const ragFiles = computed(() => settingsStore.settings.ragFiles || []);
+  const selectedRagFiles = computed(() => settingsStore.settings.selectedRagFiles || []);
+  const isChangedRag = computed(() => selectedRagFiles.value.length > 0);
+  const filteredRagFiles = computed(() =>
+    ragSearch.value
+      ? ragFiles.value.filter(name => name.toLowerCase().includes(ragSearch.value.toLowerCase()))
+      : ragFiles.value
   );
 
   const systemPrompts = computed(() => settingsStore.settings.systemPrompts);
@@ -67,8 +77,24 @@
       setTimeout(() => {
         selectedPrompt.value = prompt;
         promptSearch.value = prompt?.title || '';
-      }, 100)
+      }, 100);
     }
+  };
+
+  const toggleRagFile = (filename: string) => {
+    const currentFiles = [...selectedRagFiles.value];
+    const index = currentFiles.indexOf(filename);
+    if (index >= 0) {
+      currentFiles.splice(index, 1);
+    } else {
+      currentFiles.push(filename);
+    }
+    settingsStore.updateSettings({ selectedRagFiles: currentFiles });
+  };
+
+  const clearRagFiles = () => {
+    settingsStore.updateSettings({ selectedRagFiles: [] });
+    ragMenu.value = false;
   };
 
   const truncateContent = (content: string) => {
@@ -149,6 +175,11 @@
   const handlePromptInput = (value: string) => {
     promptSearch.value = value;
     promptMenu.value = true;
+  };
+
+  const handleRagInput = (value: string) => {
+    ragSearch.value = value;
+    ragMenu.value = true;
   };
 
   const handleClear = () => {
@@ -319,6 +350,69 @@
         @click="selectModel(settingsStore.settings.defaultModel || settingsStore.settings.systemModel)"
       />
       <v-spacer />
+      <v-menu :close-on-content-click="false" location="top">
+        <template #activator="{ props }">
+          <v-btn
+            v-bind="props"
+            append-icon="mdi-chevron-down"
+            class="rag-btn"
+            :color="isChangedRag ? 'primary' : 'white'"
+            prepend-icon="mdi-file-document"
+            variant="tonal"
+          >
+            RAG Files
+          </v-btn>
+        </template>
+        <v-card min-width="300">
+          <v-card-text class="pa-2">
+            <div class="autocomplete-rag__list">
+              <v-list-item v-if="!ragFiles.length" disabled>
+                <div class="autocomplete-rag__item">No files</div>
+              </v-list-item>
+              <v-list-item
+                v-for="file in filteredRagFiles"
+                :key="file"
+                :active="selectedRagFiles.includes(file)"
+                :value="file"
+                @click="toggleRagFile(file)"
+              >
+                <div class="autocomplete-rag__item" :title="file">
+                  {{ file }}
+                  <v-icon
+                    v-if="selectedRagFiles.includes(file)"
+                    color="primary"
+                    icon="mdi-check-circle"
+                    size="small"
+                  />
+                </div>
+              </v-list-item>
+            </div>
+
+            <v-text-field
+              v-model="ragSearch"
+              class="mb-2 mt-2"
+              clearable
+              dense
+              hide-details
+              placeholder="Filter RAG files"
+              variant="solo-filled"
+              @input="handleRagInput($event.target.value)"
+            >
+              <template #append-inner>
+                <v-btn
+                  class="rag-btn"
+                  :color="'red'"
+                  :disabled="!selectedRagFiles.length"
+                  icon="mdi-backup-restore"
+                  size="small"
+                  variant="tonal"
+                  @click="clearRagFiles"
+                />
+              </template>
+            </v-text-field>
+          </v-card-text>
+        </v-card>
+      </v-menu>
       <v-btn
         class="file-btn"
         :color="attachment ? 'blue' : 'white'"
@@ -508,7 +602,7 @@
   }
 }
 
-::v-deep(.model-btn) {
+::v-deep(.model-btn, .rag-btn) {
   max-width: 300px;
   width: auto;
   position: relative;
@@ -517,6 +611,7 @@
   overflow: hidden;
 }
 
+::v-deep(.autocomplete-rag__list),
 ::v-deep(.autocomplete-model__list) {
   display: flex;
   flex-direction: column;
@@ -526,6 +621,7 @@
   overflow: auto;
 }
 
+::v-deep(.autocomplete-rag__item),
 ::v-deep(.autocomplete-model__item) {
   display: flex;
   justify-content: space-between;

@@ -12,6 +12,7 @@ import { SearchModule } from './search/search.module';
 import { MemoryModule } from './memory/memory.module';
 import { LinkParserModule } from './link-parser/link-parser.module';
 import { WebUtilsModule } from './web-utils/web-utils.module';
+import { RagModule } from './rag/rag.module';
 
 @Module({
   imports: [
@@ -19,6 +20,8 @@ import { WebUtilsModule } from './web-utils/web-utils.module';
       driver: ApolloDriver,
       autoSchemaFile: join(process.cwd(), 'src/schema.gql'),
       playground: true,
+      context: ({ req }) => ({ req }),
+      installSubscriptionHandlers: true,
     }),
     TypeOrmModule.forRoot({
       type: 'better-sqlite3',
@@ -34,6 +37,7 @@ import { WebUtilsModule } from './web-utils/web-utils.module';
     WebUtilsModule,
     SearchModule,
     LinkParserModule,
+    RagModule,
   ],
   controllers: [AppController],
   providers: [AppService, AppResolver],

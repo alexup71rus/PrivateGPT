@@ -8,7 +8,7 @@ export function buildOllamaRequestBody (
   finalContent: string,
   attachmentContent: Attachment | null | undefined,
   memoryContent: string | null | undefined,
-  tempMessages: { role: 'system'; content: string }[], // Временные сообщения
+  tempMessages: { role: 'system'; content: string }[],
   isSearchActive: boolean,
   settings: ISettings
 ) {

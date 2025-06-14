@@ -362,3 +362,126 @@ export async function replaceChatMessages (chatId: string, messages: Message[]):
     handleGraphQLError(error);
   }
 }
+
+export async function uploadRagFiles (
+  files: File[],
+  ollamaURL: string,
+  embeddingsModel: string,
+): Promise<string[]> {
+  try {
+    const client = await getGraphQLClient();
+    const mutation = gql`
+      mutation UploadRagFiles($files: [Upload!]!, $ollamaURL: String!, $embeddingsModel: String!) {
+        uploadRagFiles(files: $files, ollamaURL: $ollamaURL, embeddingsModel: $embeddingsModel)
+      }
+    `;
+    const formData = new FormData();
+    formData.append(
+      'operations',
+      JSON.stringify({
+        query: mutation.loc!.source.body,
+        variables: { files: files.map(() => null), ollamaURL, embeddingsModel },
+        operationName: 'UploadRagFiles',
+      })
+    );
+    formData.append('map', JSON.stringify(Object.fromEntries(files.map((_, i) => [`${i}`, [`variables.files.${i}`]]))));
+    files.forEach((file, i) => formData.append(`${i}`, file, file.name));
+    const response = await fetch('http://localhost:3001/graphql', {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'x-apollo-operation-name': 'UploadRagFiles',
+        'Accept': 'application/json',
+      },
+    });
+    const { data, errors } = await response.json();
+    if (errors) {
+      throw new Error(errors[0].message);
+    }
+    return data.uploadRagFiles || [];
+  } catch (error) {
+    handleGraphQLError(error);
+    throw error;
+  }
+}
+
+export async function getRagFiles (): Promise<string[]> {
+  try {
+    const client = await getGraphQLClient();
+    const query = gql`
+      query {
+        getRagFiles
+      }
+    `;
+    const { getRagFiles } = await client.request<{ getRagFiles: string[] }>(query);
+    return getRagFiles || [];
+  } catch (error) {
+    handleGraphQLError(error);
+    return [];
+  }
+}
+
+export async function deleteRagFile (filename: string): Promise<void> {
+  try {
+    const client = await getGraphQLClient();
+    const mutation = gql`
+      mutation DeleteRagFile($filename: String!) {
+        deleteRagFile(filename: $filename)
+      }
+    `;
+    await client.request(mutation, { filename });
+  } catch (error) {
+    handleGraphQLError(error);
+    throw error;
+  }
+}
+
+export async function getEmbeddings (filename: string): Promise<number[]> {
+  try {
+    const client = await getGraphQLClient();
+    const query = gql`
+      query GetEmbeddings($filename: String!) {
+        getEmbeddings(filename: $filename)
+      }
+    `;
+    const { getEmbeddings } = await client.request<{ getEmbeddings: number[] }>(query, { filename });
+    return getEmbeddings || [];
+  } catch (error) {
+    handleGraphQLError(error);
+    return [];
+  }
+}
+
+export async function searchRagFiles (
+  query: string,
+  filenames: string[],
+  ollamaURL: string,
+  embeddingsModel: string,
+  limit: number = 3
+): Promise<{ filename: string; text: string; similarity: number }[]> {
+  try {
+    const client = await getGraphQLClient();
+    const mutation = gql`
+      query SearchRagFiles($query: String!, $filenames: [String!]!, $ollamaURL: String!, $embeddingsModel: String!, $limit: Int!) {
+        searchRagFiles(query: $query, filenames: $filenames, ollamaURL: $ollamaURL, embeddingsModel: $embeddingsModel, limit: $limit) {
+          filename
+          text
+          similarity
+        }
+      }
+    `;
+    const { searchRagFiles } = await client.request<{
+      searchRagFiles: { filename: string; text: string; similarity: number }[];
+    }>(mutation, {
+      query,
+      filenames,
+      ollamaURL,
+      embeddingsModel,
+      limit,
+    });
+    return searchRagFiles || [];
+  } catch (error) {
+    handleGraphQLError(error);
+    return [];
+  }
+}

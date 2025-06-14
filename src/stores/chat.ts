@@ -12,6 +12,7 @@ import {
   saveChatMeta,
   saveMessage,
   searchBackend,
+  searchRagFiles,
   waitForBackend,
 } from '@/api/chats';
 import { type OllamaModel, type OllamaTagsResponse } from '@/types/ollama.ts';
@@ -369,7 +370,7 @@ export const useChatStore = defineStore('chat', {
                 model: searchModel,
                 messages: [
                   { role: 'system', content: this.settings.searchPrompt },
-                  { role: 'user', content },
+                  { role: 'user', content: finalContent },
                 ],
                 stream: false,
               },
@@ -390,6 +391,20 @@ export const useChatStore = defineStore('chat', {
           } catch (error) {
             searchResults = null;
           }
+        }
+
+        let ragContext: string = '';
+        if (this.settings.selectedRagFiles?.length) {
+          const ragResults = await searchRagFiles(
+            finalContent,
+            this.settings.selectedRagFiles,
+            this.settings.ollamaURL,
+            this.settings.embeddingsModel || this.selectedModel,
+            3
+          );
+          ragContext = ragResults
+            .map(result => `[Document: ${result.filename}, Similarity: ${result.similarity.toFixed(2)}]\n${result.text}`)
+            .join('\n\n');
         }
 
         userMessageId = await this.addMessage(chatId, {
@@ -438,6 +453,13 @@ export const useChatStore = defineStore('chat', {
           tempMessages.push({
             role: 'system',
             content: linkMessage,
+          });
+        }
+
+        if (ragContext) {
+          tempMessages.push({
+            role: 'system',
+            content: `[RAG Context]\n${ragContext}`,
           });
         }
 
@@ -564,8 +586,6 @@ export const useChatStore = defineStore('chat', {
           const cachedAttachmentMeta = message.attachmentMeta;
           const cachedAttachmentContent = message.attachmentContent;
 
-          console.log('Editing message with attachment content:', cachedAttachmentContent);
-
           const messageIdsToDelete = chat.messages.slice(index).map(m => m.id);
           chat.messages = chat.messages.slice(0, index);
           chat.timestamp = Date.now();
@@ -647,8 +667,6 @@ export const useChatStore = defineStore('chat', {
         const cachedContent = prevMessage.content;
         const cachedAttachmentMeta = prevMessage.attachmentMeta;
         const cachedAttachmentContent = prevMessage.attachmentContent;
-
-        console.log('Regenerating message with attachment content:', cachedAttachmentContent);
 
         const messageIdsToDelete = chat.messages.slice(index - 1).map(m => m.id);
         chat.messages = chat.messages.slice(0, index - 1);

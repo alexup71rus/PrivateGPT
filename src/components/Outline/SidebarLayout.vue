@@ -60,6 +60,10 @@
     if (props.isChatPage) {
       router.push(`/settings`);
     } else {
+      if (!chat.chats?.length) {
+        await chat.fetchChats();
+      }
+
       const activeChat = chat.activeChat;
 
       if (activeChat) {
