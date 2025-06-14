@@ -1,17 +1,15 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import puppeteer, { Browser, Page } from 'puppeteer';
 import * as cheerio from 'cheerio';
 import { EXCLUDED_CLASSES, EXCLUDED_TAGS } from './web-utils.constants';
 
 @Injectable()
 export class WebUtilsService {
-  private readonly logger = new Logger(WebUtilsService.name);
   private readonly EXCLUDE_SELECTOR = [
     ...EXCLUDED_TAGS,
     ...EXCLUDED_CLASSES.map((cls) => `.${cls}`),
   ].join(',');
 
-  // Fetches and renders HTML content from a URL
   private async getRenderedHtml(
     url: string,
     retries: number = 2,
@@ -47,18 +45,12 @@ export class WebUtilsService {
             'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         });
 
-        page.on('console', (msg) => {
-          if (msg.type() === 'error') {
-            this.logger.warn(`JS error on page ${url}: ${msg.text()}`);
-          }
-        });
-
         const response = await page.goto(url, {
           waitUntil: 'networkidle0',
           timeout: 90000,
         });
         if (!response?.ok()) {
-          this.logger.warn(`HTTP status for ${url}: ${response?.status()}`);
+          throw new Error(`HTTP status: ${response?.status()}`);
         }
 
         await page
@@ -68,30 +60,18 @@ export class WebUtilsService {
               timeout: 10000,
             },
           )
-          .catch(() => {
-            this.logger.warn(
-              `Key selectors not found for ${url} on attempt ${attempt}`,
-            );
-          });
+          .catch(() => {});
 
-        await page.evaluate(() =>
-          window.scrollTo(0, document.body.scrollHeight),
-        );
         await new Promise((resolve) => setTimeout(resolve, 5000));
 
         const html = await page.content();
         if (html.length < 100) {
-          this.logger.warn(`HTML too short: ${html.slice(0, 100)}`);
+          throw new Error('HTML too short');
         }
         return html;
       } catch (error) {
-        this.logger.error(
-          `Puppeteer error on attempt ${attempt} for ${url}: ${error.message}`,
-        );
         if (attempt === retries) {
-          throw new Error(
-            `Failed to render ${url} after ${retries} attempts: ${error.message}`,
-          );
+          throw new Error(`Failed to render ${url}: ${error.message}`);
         }
         await new Promise((resolve) => setTimeout(resolve, 2000 * attempt));
       } finally {
@@ -104,7 +84,6 @@ export class WebUtilsService {
     throw new Error('Unexpected rendering error');
   }
 
-  // Extracts text from HTML elements recursively
   private extractText($: cheerio.CheerioAPI, element: any): string {
     const blockElements = [
       'section',
@@ -148,7 +127,6 @@ export class WebUtilsService {
     return text.trim();
   }
 
-  // Cleans text by normalizing whitespace and formatting
   public cleanText(text: string): string {
     if (!text) return '';
     return text
@@ -159,15 +137,12 @@ export class WebUtilsService {
       .trim();
   }
 
-  // Parses HTML content from a URL and extracts relevant text
   async parseHtmlContent(url: string, maxSize: number): Promise<string> {
     try {
       let decodedUrl = url;
       try {
         decodedUrl = decodeURIComponent(url);
-      } catch (e) {
-        this.logger.warn(`Failed to decode URL: ${url}`);
-      }
+      } catch {}
 
       const html = await this.getRenderedHtml(decodedUrl);
       const $ = cheerio.load(html, { xmlMode: false });
@@ -185,7 +160,7 @@ export class WebUtilsService {
       const processedTexts = new Set<string>();
 
       const containers = $('body')
-        .find('section, article, main, h1, h2, h3, ul, ol, a, p, div')
+        .find('*')
         .filter((_, el) => {
           const text = this.extractText($, el);
           return text.length > 5;
@@ -220,12 +195,8 @@ export class WebUtilsService {
         }
       }
 
-      if (content === 'Content unavailable') {
-        this.logger.error(`Final content unavailable for ${decodedUrl}`);
-      }
       return content;
-    } catch (error) {
-      this.logger.error(`Parsing error for ${url}: ${error.message}`);
+    } catch {
       return 'Content unavailable';
     }
   }

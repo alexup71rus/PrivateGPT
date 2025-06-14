@@ -446,7 +446,7 @@ export const useChatStore = defineStore('chat', {
         }
 
         if (linkContent) {
-          let linkMessage = `[Link Content: ${JSON.stringify(linkContent)}]`;
+          let linkMessage = `[Link Content: ${JSON.stringify(linkContent.content ?? {})}]`;
           if (linkContent.error) {
             linkMessage += `\n[Link Content Error: ${linkContent.error}]`;
           }

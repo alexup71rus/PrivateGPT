@@ -7,6 +7,7 @@
   import { useAlert } from '@/plugins/alertPlugin.ts';
   import { useDeleteButton } from '@/composables/useDeleteButton.ts';
   import type { Chat } from '@/types/chats.ts';
+  import { useSettingsStore } from '@/stores/settings.ts';
   import { formatDate } from '../../utils/chatUtils.ts';
 
   const props = defineProps<{
@@ -17,16 +18,24 @@
   const router = useRouter();
   const app = useAppStore();
   const chat = useChatStore();
+  const settingsStore = useSettingsStore();
   const { showSnackbar, showConfirm } = useAlert();
   const { onNewChat, selectChat, deleteChat } = useChatActions();
   const { handleFirstClick, handleSecondClick, resetDeletePending, isPending } = useDeleteButton(deleteChat);
 
   const searchQuery = ref<string>('');
+  const selectedPromptFilter = ref<string | null>(null);
 
   const groupedChats = computed(() => {
     const groups: { [key: string]: Chat[] } = {};
     const sortedChats = [...chat.chats]
-      .filter(chat => chat.title.toLowerCase().includes(searchQuery.value?.toLowerCase() || ''))
+      .filter(chat => {
+        const matchesSearch = chat.title.toLowerCase().includes(searchQuery.value?.toLowerCase() || '');
+        const matchesPrompt = selectedPromptFilter.value
+          ? chat.systemPrompt?.title === selectedPromptFilter.value
+          : true;
+        return matchesSearch && matchesPrompt;
+      })
       .sort((a, b) => b.timestamp - a.timestamp);
 
     sortedChats.forEach(chat => {
@@ -90,19 +99,27 @@
 
   const removeAllChats = async () => {
     showConfirm({
-      title: 'Предупреждение',
-      message: 'Вы действительно хотите удалить все чаты?',
+      title: 'Warning',
+      message: 'Are you sure you want to delete all chats?',
       buttons: [
-        { text: 'Да', color: 'warning', value: true },
-        { text: 'Отмена', color: 'white', value: false },
+        { text: 'Yes', color: 'warning', value: true },
+        { text: 'Cancel', color: 'white', value: false },
       ],
       resolve: res => {
         if (res) {
           chat.clearChats();
-          showSnackbar({ message: 'Все чаты успешно удалены', type: 'success' });
+          showSnackbar({ message: 'All chats deleted successfully', type: 'success' });
         }
       },
     });
+  };
+
+  const clearPromptFilter = () => {
+    selectedPromptFilter.value = null;
+  };
+
+  const setPromptFilter = (promptTitle: string) => {
+    selectedPromptFilter.value = promptTitle;
   };
 
   onMounted(initializeChat);
@@ -146,6 +163,30 @@
               />
             </template>
           </v-text-field>
+
+          <div class="prompt-filters">
+            <div
+              :class="['prompt-filter-item', { 'prompt-filter-item--selected': !selectedPromptFilter }]"
+              :style="{ opacity: !selectedPromptFilter ? 0.3 : 1 }"
+              @click="clearPromptFilter"
+            >
+              <v-icon
+                :color="selectedPromptFilter ? 'red' : ''"
+              >
+                mdi-close-circle
+              </v-icon>
+              <span>Clear Filter</span>
+            </div>
+            <div
+              v-for="prompt in settingsStore.settings.systemPrompts"
+              :key="prompt.title"
+              :class="['prompt-filter-item', { 'prompt-filter-item--selected': selectedPromptFilter === prompt.title }]"
+              @click="setPromptFilter(prompt.title)"
+            >
+              <v-icon>mdi-folder</v-icon>
+              <span>{{ prompt.title }}</span>
+            </div>
+          </div>
 
           <div class="chats-list">
             <template v-if="chat.chats?.length > 0">
@@ -305,11 +346,53 @@
   flex: 0;
 }
 
+.prompt-filters {
+  max-height: 300px;
+  overflow-y: auto;
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.prompt-filter-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  background-color: rgba(var(--v-theme-background) / 20%);
+  cursor: pointer;
+  border-radius: 10px;
+  width: 330px;
+  height: 50px;
+  gap: 10px;
+
+  &--selected {
+    background-color: rgba(var(--v-theme-background) / 80%);
+    transition: .2s;
+  }
+
+  &:hover {
+    background-color: rgba(var(--v-theme-background) / 80%) !important;
+  }
+
+  &:not(.prompt-filter-item--selected):hover {
+    background-color: rgba(var(--v-theme-background) / 60%) !important;
+  }
+}
+
+.prompt-filter-item span {
+  flex-grow: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .chats-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  height: calc(100vh - 300px);
+  height: calc(100vh - 450px);
   overflow-y: auto;
   flex: 1 1 auto;
   min-height: 0;

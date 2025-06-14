@@ -6,7 +6,7 @@
   import { DEFAULT_SETTINGS, type ISettings } from '@/types/settings.ts';
   import { deleteRagFile, uploadRagFiles } from '@/api/chats.ts';
 
-  type RagSettings = Pick<ISettings, 'embeddingsModel' | 'ragFiles' | 'selectedRagFiles'>;
+  type RagSettings = Pick<ISettings, 'embeddingsModel' | 'ragFiles' | 'selectedRagFiles' | 'ragPrompt'>;
 
   const settingsStore = useSettingsStore();
   const chatStore = useChatStore();
@@ -16,6 +16,7 @@
     embeddingsModel: settingsStore.settings.embeddingsModel || DEFAULT_SETTINGS.embeddingsModel,
     ragFiles: settingsStore.settings.ragFiles || DEFAULT_SETTINGS.ragFiles,
     selectedRagFiles: settingsStore.settings.selectedRagFiles || DEFAULT_SETTINGS.selectedRagFiles,
+    ragPrompt: settingsStore.settings.ragPrompt || DEFAULT_SETTINGS.ragPrompt,
   });
 
   const uploadedFiles = ref<File[]>([]);
@@ -62,6 +63,7 @@
       embeddingsModel: DEFAULT_SETTINGS.embeddingsModel,
       ragFiles: [...DEFAULT_SETTINGS.ragFiles],
       selectedRagFiles: [...DEFAULT_SETTINGS.selectedRagFiles],
+      ragPrompt: DEFAULT_SETTINGS.ragPrompt,
     };
     uploadedFiles.value = [];
     showSnackbar({ message: 'RAG settings reset', type: 'success' });
@@ -116,9 +118,7 @@
 </script>
 
 <template>
-  <v-card-title class="text-h6 pb-2">
-    RAG System
-  </v-card-title>
+  <v-card-title class="text-h6 pb-2">RAG System</v-card-title>
   <v-card-text>
     <v-form @submit.prevent="saveSettings">
       <v-select
@@ -133,6 +133,14 @@
         :loading="connectionStatus === 'checking'"
         persistent-hint
         :rules="[v => !!v || 'Embeddings model is required']"
+        variant="solo-filled"
+      />
+
+      <v-textarea
+        v-model="formSettings.ragPrompt"
+        class="mb-4"
+        label="RAG Prompt"
+        rows="4"
         variant="solo-filled"
       />
 
@@ -162,11 +170,7 @@
       <h3 class="section-subtitle">Uploaded Files</h3>
 
       <v-list v-if="settingsStore.isLoadedRag" class="prompt-list">
-        <v-list-item
-          v-for="(fileName, index) in fileList"
-          :key="index"
-          class="prompt-item"
-        >
+        <v-list-item v-for="(fileName, index) in fileList" :key="index" class="prompt-item">
           <div class="prompt-content">
             <div class="content-title">{{ fileName }}</div>
           </div>
@@ -181,12 +185,8 @@
           </template>
         </v-list-item>
       </v-list>
-      <div v-else class="no-data">
-        Loading files...
-      </div>
-      <div v-if="settingsStore.isLoadedRag && !fileList.length" class="no-data">
-        No files uploaded
-      </div>
+      <div v-else class="no-data">Loading files...</div>
+      <div v-if="settingsStore.isLoadedRag && !fileList.length" class="no-data">No files uploaded</div>
 
       <v-card-actions>
         <v-col>
@@ -197,7 +197,9 @@
             type="submit"
             variant="flat"
             @click="saveSettings"
-          >Save Settings</v-btn>
+          >
+            Save Settings
+          </v-btn>
         </v-col>
         <v-col>
           <v-btn
@@ -205,7 +207,9 @@
             :disabled="isUploading"
             variant="outlined"
             @click="resetSettings"
-          >Reset Settings</v-btn>
+          >
+            Reset Settings
+          </v-btn>
         </v-col>
       </v-card-actions>
     </v-form>

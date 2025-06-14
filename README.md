@@ -1,4 +1,4 @@
-**PrivateGPT** is a local AI client replicating the functionality of ChatGPT, Groq, and Yandex Alice — but fully private and self-hosted.
+**PrivateGPT** is a local AI client replicating the functionality of ChatGPT, Grok, and Yandex Alice — but fully private and self-hosted.
 
 <img src="./src/assets/logo.svg" alt="Logo" width="100" />
 
@@ -12,19 +12,26 @@
 
 * 💬 Works with local LLMs via **Ollama**
 * 🧠 Persistent memory (summarization-based), like GPT
-* 🖼️ Image generation _**(in development)**_
 * 🔍 Internet search and check provided links
-* 📄 Upload and analyze documents (RAG database in development, supports only text files)
-* 🖼️ Supports images
+* * 🔎 Chat sessions with system prompt filters
+* 📄 Upload and analyze text documents (RAG supports `.txt`, more formats planned)
+* 🖼️ Supports image input in chat
 * ⚡ Quick system prompt snippets
 * ⚙️ Minimal, easily adaptable codebase
+
+### 🚀 In Development
+
+* 🔗 Chat list with system prompt filters
+* 🎤 Voice chat support
+* 🚀 Support for third-party API tools
+* 🗋 Better support for various document formats in RAG
 
 ### ⚙️ Required Models
 
 Download and configure via Ollama:
 
-1. **Summarization model** (used for persistent memory and generating titles)
-2. **RAG model** (used for document-based retrieval and persistent memory)
+1. **Any general model**
+2. **RAG model** (used for document-based retrieval and memory)
 3. **Image generation model**
 
 ### 🌐 Optional: SearXNG Search Engine
@@ -73,9 +80,25 @@ Or to launch the Electron app:
 pnpm dev:electron
 ```
 
+### ⚠️ Threshold
+
+For Mac on an M-chip:
+
+```bash
+cd backend/node_modules/.pnpm/better-sqlite3@*/node_modules/better-sqlite3
+npx node-gyp rebuild
+```
+
+### 🌐 Roadmap
+
+* 🔍 Better local document indexing and RAG refinement
+* 🎤 Optional voice input/output (speech-to-text + TTS)
+* ⚖️ API integration support (external tools or agents)
+
 ### 📄 License
 
 [Apache License](https://github.com/alexup71rus/PrivateGPT/blob/master/LICENSE)
 
 ### 📧 Contact
+
 TG: [@alexup71rus](https://t.me/alexup71rus)

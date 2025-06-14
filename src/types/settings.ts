@@ -41,6 +41,7 @@ export const DEFAULT_SETTINGS = {
     '- Russian: "вибриссы котов" for user: "Как называются усы у котов?"\n' +
     '- Spanish: "receta ramen casera" for user: "Escribe una receta de ramen"\n' +
     '- French: "plan voyage Paris" for user: "Plan a trip to Paris"' as string,
+  ragPrompt: 'Extract relevant information from provided documents and generate a concise, accurate response based on the user’s query.' as string,
   searchResultsLimit: 3 as number,
   followSearchLinks: false as boolean,
   maxMessages: 20 as MaxMessages,
