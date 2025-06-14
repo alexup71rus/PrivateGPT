@@ -1,20 +1,20 @@
-import type { HttpModule } from '@/services/http'
-import { useAlert } from '@/plugins/alertPlugin'
+import type { HttpModule } from '@/services/http';
+import { useAlert } from '@/plugins/alertPlugin';
 
-export function createSnackbarModule(): HttpModule {
+export function createSnackbarModule (): HttpModule {
   return {
-    onResponse(response) {
+    onResponse (response) {
       return response
     },
-    onResponseError(error) {
+    onResponseError (error) {
       const { showSnackbar } = useAlert();
 
       showSnackbar({
-        title: 'Ошибка',
-        message: error?.response?.data?.message || error.message || 'Ошибка запроса',
-        type: ''
+        title: 'Error',
+        message: error?.response?.data?.message || error.message || 'Error query',
+        type: '',
       })
       return Promise.reject(error)
-    }
+    },
   }
 }

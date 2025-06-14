@@ -111,7 +111,6 @@
   height: var(--main-height);
 }
 
-/* Для перетаскивания окна */
 .v-app-bar {
   -webkit-app-region: drag;
 }

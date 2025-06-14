@@ -94,6 +94,7 @@ npx node-gyp rebuild
 * 🔍 Better local document indexing and RAG refinement
 * 🎤 Optional voice input/output (speech-to-text + TTS)
 * ⚖️ API integration support (external tools or agents)
+* 🌍 Interface multilingual support
 
 ### 📄 License
 

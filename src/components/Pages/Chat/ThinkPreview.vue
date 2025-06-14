@@ -1,23 +1,23 @@
 <script lang="ts" setup>
-import { computed, ref, watch, nextTick } from 'vue';
-import { parseMarkdown } from '@/utils/markdown';
-import { formatThinkTime } from '@/utils/chatUtils';
+  import { computed, nextTick, ref, watch } from 'vue';
+  import { parseMarkdown } from '@/utils/markdown';
+  import { formatThinkTime } from '@/utils/chatUtils';
 
-const props = defineProps<{
-  message: { thinkTime?: number; isThinking?: boolean; content: string };
-}>();
+  const props = defineProps<{
+    message: { thinkTime?: number; isThinking?: boolean; content: string };
+  }>();
 
-const expandedPanel = ref<number[] | number | null>(null);
-const thinkPreviewRef = ref<HTMLElement>();
-const parsedThinkContent = computed(() => parseMarkdown(props.message.content, true));
+  const expandedPanel = ref<number[] | number | null>(null);
+  const thinkPreviewRef = ref<HTMLElement>();
+  const parsedThinkContent = computed(() => parseMarkdown(props.message.content, true));
 
-watch(() => props.message.content, async () => {
-  await nextTick();
-  thinkPreviewRef.value?.scrollTo({
-    top: thinkPreviewRef.value.scrollHeight - 55,
-    behavior: 'smooth',
+  watch(() => props.message.content, async () => {
+    await nextTick();
+    thinkPreviewRef.value?.scrollTo({
+      top: thinkPreviewRef.value.scrollHeight - 55,
+      behavior: 'smooth',
+    });
   });
-});
 </script>
 
 <template>
@@ -25,8 +25,8 @@ watch(() => props.message.content, async () => {
     <v-expansion-panels v-model="expandedPanel">
       <v-expansion-panel
         :title="message.isThinking
-          ? `Размышляю... (${formatThinkTime(message.thinkTime ?? 0)})`
-          : `Размышлял в течение: ${formatThinkTime(message.thinkTime ?? 0)}`"
+          ? `Thinking... (${formatThinkTime(message.thinkTime ?? 0)})`
+          : `Thought for: ${formatThinkTime(message.thinkTime ?? 0)}`"
       >
         <v-expansion-panel-text>
           <v-card variant="tonal" v-html="parsedThinkContent" />
@@ -39,8 +39,8 @@ watch(() => props.message.content, async () => {
         class="preview"
         variant="elevated"
       >
-        <template v-slot:text>
-          <div class="preview__content" ref="thinkPreviewRef" v-html="parsedThinkContent"></div>
+        <template #text>
+          <div ref="thinkPreviewRef" class="preview__content" v-html="parsedThinkContent" />
         </template>
       </v-card>
     </v-expand-transition>

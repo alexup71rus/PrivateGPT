@@ -40,7 +40,7 @@ export class RagService {
       const embedding = this.embeddingRepository.create({
         filename: file.filename,
         embeddings: response.data.embedding,
-        text: content, // Сохраняем текст файла
+        text: content,
         createdAt: new Date(),
       });
       await this.embeddingRepository.save(embedding);
@@ -71,19 +71,16 @@ export class RagService {
     embeddingsModel: string,
     limit: number = 3,
   ): Promise<{ filename: string; text: string; similarity: number }[]> {
-    // Получаем эмбеддинг запроса
     const queryResponse = await axios.post(`${ollamaURL}/api/embeddings`, {
       model: embeddingsModel,
       prompt: query,
     });
     const queryEmbedding = queryResponse.data.embedding;
 
-    // Получаем эмбеддинги и тексты указанных файлов
     const embeddings = await this.embeddingRepository.find({
       where: { filename: In(filenames) },
     });
 
-    // Вычисляем косинусное сходство
     const results = embeddings
       .map((embedding) => {
         const similarity = this.cosineSimilarity(
@@ -96,7 +93,7 @@ export class RagService {
           similarity,
         };
       })
-      .filter((result) => result.similarity > 0.5) // Порог сходства
+      .filter((result) => result.similarity > 0.5)
       .sort((a, b) => b.similarity - a.similarity)
       .slice(0, limit);
 

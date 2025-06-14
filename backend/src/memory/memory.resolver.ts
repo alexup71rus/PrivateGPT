@@ -72,7 +72,7 @@ export class MemoryResolver {
 
     const entities = entries.map((entry) =>
       this.memoryRepository.create({
-        id: entry.id, // Если id не передан, TypeORM сгенерирует новый
+        id: entry.id,
         content: entry.content,
         createdAt: new Date(entry.createdAt),
         updatedAt: entry.updatedAt ? new Date(entry.updatedAt) : undefined,

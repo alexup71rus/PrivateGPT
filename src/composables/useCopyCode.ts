@@ -1,7 +1,7 @@
-import type {Ref} from "vue";
-import {onMounted} from "vue";
+import type { Ref } from 'vue';
+import { onMounted } from 'vue';
 
-export function useCopyCode(bubbleRef: Ref<HTMLElement | undefined>, showSnackbar: (args: { message: string; type: string }) => void) {
+export function useCopyCode (bubbleRef: Ref<HTMLElement | undefined>, showSnackbar: (args: { message: string; type: string }) => void) {
   onMounted(() => {
     bubbleRef.value?.addEventListener('click', async (ev: MouseEvent) => {
       const target = ev.target as HTMLElement;
@@ -15,7 +15,7 @@ export function useCopyCode(bubbleRef: Ref<HTMLElement | undefined>, showSnackba
 
           await navigator.clipboard.writeText(code);
 
-          showSnackbar({ message: 'Код скопирован!', type: 'success' });
+          showSnackbar({ message: 'Copied!', type: 'success' });
         }
       }
     });
