@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import pLimit from 'p-limit';
 import { URL } from 'url';
 import * as cheerio from 'cheerio';
 import { WebUtilsService } from '../web-utils/web-utils.service';
@@ -32,7 +31,6 @@ export class SearchService {
 
   constructor(private readonly webUtilsService: WebUtilsService) {}
 
-  // Performs search using SearXNG and processes results
   async search(
     query: string,
     searxngUrl: string,
@@ -82,7 +80,6 @@ export class SearchService {
       );
 
       if (format === 'json') {
-        // Fetch JSON results from SearXNG
         const searxngController = new AbortController();
         const searxngTimeout = setTimeout(() => {
           searxngController.abort();
@@ -126,7 +123,6 @@ export class SearchService {
           clearTimeout(searxngTimeout);
         }
       } else if (format === 'html') {
-        // Fetch HTML results using Puppeteer
         const html = await this.webUtilsService.parseHtmlContent(
           searchUrl,
           MAX_HTML_SIZE,
@@ -155,11 +151,12 @@ export class SearchService {
       }
 
       if (followLinks && results.length > 0) {
-        // Follow links to fetch additional content
-        const limitFn = pLimit(3);
-        results = await Promise.all(
-          results.map((item) =>
-            limitFn(async () => {
+        const batchSize = 3;
+        const processedResults: SearchResultItem[] = [];
+        for (let i = 0; i < results.length; i += batchSize) {
+          const batch = results.slice(i, i + batchSize);
+          const batchResults = await Promise.all(
+            batch.map(async (item) => {
               let absoluteUrl = item.url;
               try {
                 absoluteUrl = decodeURIComponent(absoluteUrl);
@@ -187,8 +184,10 @@ export class SearchService {
                 };
               }
             }),
-          ),
-        );
+          );
+          processedResults.push(...batchResults);
+        }
+        results = processedResults;
       }
 
       // Format results with default values

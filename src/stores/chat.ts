@@ -296,8 +296,11 @@ export const useChatStore = defineStore('chat', {
 
         const response = await this.http.request({
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          url: `${this.settings.ollamaURL}/api/chat`,
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Ollama-URL': this.settings.ollamaURL,
+          },
+          url: `${this.settings.backendURL}/api/chat`,
           data: {
             model: this.settings.systemModel || this.selectedModel,
             messages: [
@@ -364,8 +367,11 @@ export const useChatStore = defineStore('chat', {
 
             const searchQueryResponse = await this.http.request({
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              url: `${this.settings.ollamaURL}/api/chat`,
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Ollama-URL': this.settings.ollamaURL,
+              },
+              url: `${this.settings.backendURL}/api/chat`,
               data: {
                 model: searchModel,
                 messages: [
@@ -475,9 +481,12 @@ export const useChatStore = defineStore('chat', {
           this.settings
         );
 
-        const response = await fetch(`${this.settings.ollamaURL}/api/${hasAttachment && attachmentContent?.type === AttachmentType.IMAGE ? 'generate' : 'chat'}`, {
+        const response = await fetch(`${this.settings.backendURL}/api/${hasAttachment && attachmentContent?.type === AttachmentType.IMAGE ? 'generate' : 'chat'}`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Ollama-URL': this.settings.ollamaURL,
+          },
           body: JSON.stringify(body),
           signal: this.abortController.signal,
         });
@@ -697,7 +706,10 @@ export const useChatStore = defineStore('chat', {
       try {
         const response = await this.http.request<OllamaTagsResponse>({
           method: 'GET',
-          url: `${this.settings.ollamaURL}/api/tags`,
+          url: `${this.settings.backendURL}/api/tags`,
+          headers: {
+            'X-Ollama-URL': this.settings.ollamaURL,
+          },
         });
         this.models = response.models || [];
         return this.models;

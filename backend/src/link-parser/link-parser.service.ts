@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import pLimit from 'p-limit';
 import { WebUtilsService } from '../web-utils/web-utils.service';
 import { LinkContent } from './link-parser.resolver';
 import { MAX_HTML_SIZE, MAX_URL_LENGTH } from '../common/constants';
@@ -10,7 +9,6 @@ export class LinkParserService {
 
   constructor(private readonly webUtilsService: WebUtilsService) {}
 
-  // Fetches and processes content from provided URLs
   async fetchLinkContent(urls: string[]): Promise<LinkContent> {
     try {
       if (!urls || !urls.length) {
@@ -40,11 +38,12 @@ export class LinkParserService {
         throw new Error('No valid URLs provided');
       }
 
-      // Process URLs concurrently with a limit
-      const limitFn = pLimit(3);
-      const results = await Promise.all(
-        validUrls.map((url) =>
-          limitFn(async () => {
+      const batchSize = 3;
+      const results: { url: string; content: string }[] = [];
+      for (let i = 0; i < validUrls.length; i += batchSize) {
+        const batch = validUrls.slice(i, i + batchSize);
+        const batchResults = await Promise.all(
+          batch.map(async (url) => {
             try {
               const content = await this.webUtilsService.parseHtmlContent(
                 url,
@@ -57,8 +56,9 @@ export class LinkParserService {
               return { url, content: `Failed to load: ${errorMessage}` };
             }
           }),
-        ),
-      );
+        );
+        results.push(...batchResults);
+      }
 
       // Combine content from all URLs
       const combinedContent = results

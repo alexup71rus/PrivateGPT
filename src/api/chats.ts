@@ -8,6 +8,7 @@ import {
   type Message,
   type SearchResultItem,
 } from '@/types/chats.ts';
+import { useSettingsStore } from '@/stores/settings.ts';
 
 export async function waitForBackend (maxRetries = 10, delay = 1000) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -278,7 +279,6 @@ export async function fetchLinkContent (urls: string[]): Promise<LinkContent> {
     `;
     const encodedUrls = urls.map(url => encodeURIComponent(url));
     const { fetchLinkContent } = await client.request<{ fetchLinkContent: LinkContent }>(gqlQuery, { urls: encodedUrls });
-
     return fetchLinkContent;
   } catch (error) {
     console.error('fetchLinkContent error:', error);
@@ -375,6 +375,7 @@ export async function uploadRagFiles (
         uploadRagFiles(files: $files, ollamaURL: $ollamaURL, embeddingsModel: $embeddingsModel)
       }
     `;
+    const { settings } = useSettingsStore();
     const formData = new FormData();
     formData.append(
       'operations',
@@ -386,12 +387,13 @@ export async function uploadRagFiles (
     );
     formData.append('map', JSON.stringify(Object.fromEntries(files.map((_, i) => [`${i}`, [`variables.files.${i}`]]))));
     files.forEach((file, i) => formData.append(`${i}`, file, file.name));
-    const response = await fetch('http://localhost:3001/graphql', {
+    const response = await fetch(`${settings.backendURL}/graphql`, {
       method: 'POST',
       body: formData,
       headers: {
         'x-apollo-operation-name': 'UploadRagFiles',
         'Accept': 'application/json',
+        'X-Ollama-URL': ollamaURL,
       },
     });
     const { data, errors } = await response.json();
@@ -470,6 +472,7 @@ export async function searchRagFiles (
         }
       }
     `;
+    const { settings } = useSettingsStore();
     const { searchRagFiles } = await client.request<{
       searchRagFiles: { filename: string; text: string; similarity: number }[];
     }>(mutation, {
@@ -478,6 +481,8 @@ export async function searchRagFiles (
       ollamaURL,
       embeddingsModel,
       limit,
+    }, {
+      headers: { 'X-Ollama-URL': ollamaURL },
     });
     return searchRagFiles || [];
   } catch (error) {

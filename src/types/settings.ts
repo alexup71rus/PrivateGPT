@@ -9,7 +9,8 @@ export type SystemPrompt = {
 
 export const DEFAULT_SETTINGS = {
   isAsideOpen: false as boolean,
-  ollamaURL: 'http://localhost:11434' as string,
+  backendURL: 'http://localhost:3001' as string,
+  ollamaURL: 'http://192.168.0.126:11434' as string,
   selectedModel: '' as string,
   defaultModel: '' as string,
   memoryModel: '' as string,

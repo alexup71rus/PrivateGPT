@@ -100,8 +100,11 @@ export const useMemoryStore = defineStore('memory', {
       try {
         const response = await this.http.request({
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          url: `${this.settings.ollamaURL}/api/chat`,
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Ollama-URL': this.settings.ollamaURL,
+          },
+          url: `${this.settings.backendURL}/api/chat`,
           data: {
             model: this.settings.memoryModel || this.settings.selectedModel,
             messages: [
@@ -144,8 +147,11 @@ export const useMemoryStore = defineStore('memory', {
       try {
         const response = await this.http.request({
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          url: `${this.settings.ollamaURL}/api/chat`,
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Ollama-URL': this.settings.ollamaURL,
+          },
+          url: `${this.settings.backendURL}/api/chat`,
           data: {
             model: this.settings.memoryModel || this.settings.systemModel || this.settings.selectedModel,
             messages: [
