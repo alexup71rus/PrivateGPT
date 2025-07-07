@@ -3,7 +3,6 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { GraphQLModule } from '@nestjs/graphql';
 import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
 import { join } from 'path';
-import Database from 'better-sqlite3';
 import { ChatsModule } from './chats/chats.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -24,12 +23,12 @@ import { RagModule } from './rag/rag.module';
       installSubscriptionHandlers: true,
     }),
     TypeOrmModule.forRoot({
-      type: 'better-sqlite3',
-      database: join(process.cwd(), 'db.sqlite'),
+      type: 'sqljs',
+      database: new Uint8Array(),
+      location: join(process.cwd(), 'db.sqlite'),
+      autoSave: true,
       entities: [__dirname + '/**/*.entity{.ts,.js}'],
       synchronize: true, // TODO: use migrations
-      driver: Database,
-      logging: true,
     }),
 
     ChatsModule,

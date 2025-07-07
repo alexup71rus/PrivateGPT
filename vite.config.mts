@@ -78,4 +78,12 @@ export default defineConfig({
       },
     },
   },
-})
+  build: {
+    rollupOptions: {
+      output: {
+        assetFileNames: 'assets/[name]-[hash][extname]',
+      },
+    },
+    assetsInclude: ['**/*.woff', '**/*.woff2'],
+  },
+});

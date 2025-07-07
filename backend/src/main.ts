@@ -16,9 +16,6 @@ async function bootstrap() {
 
   app.use('/api', (req, res, next) => {
     const ollamaUrl = req.headers['x-ollama-url'] || defaultOllamaUrl;
-    console.log(
-      `Proxying ${req.method} ${ollamaUrl}${req.originalUrl}, Origin: ${req.headers.origin || 'none'}`,
-    );
 
     if (req.method === 'OPTIONS') {
       const origin =
@@ -60,9 +57,6 @@ async function bootstrap() {
           proxyRes.headers['Access-Control-Allow-Methods'] =
             'GET, POST, OPTIONS, PUT, DELETE';
           proxyRes.headers['Access-Control-Allow-Headers'] = '*';
-          console.log(
-            `Response: ${proxyRes.statusCode}, Content-Type: ${proxyRes.headers['content-type']}`,
-          );
         },
         error: (err, req, res: ServerResponse) => {
           console.error(`Proxy error: ${err.message}`);
@@ -81,7 +75,8 @@ async function bootstrap() {
   app.useStaticAssets(join(process.cwd(), 'Uploads'), { prefix: '/Uploads' });
   app.enableCors({ origin: allowedOrigins });
 
-  await app.listen(process.env.PORT || 3001);
+  const port = process.env.PORT || 3001;
+  await app.listen(port);
 }
 
 bootstrap();

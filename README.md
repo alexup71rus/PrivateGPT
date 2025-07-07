@@ -85,8 +85,8 @@ pnpm dev:electron
 For Mac on an M-chip:
 
 ```bash
-cd backend/node_modules/.pnpm/better-sqlite3@*/node_modules/better-sqlite3
-npx node-gyp rebuild
+cd backend
+pnpm postinstall
 ```
 
 ### 🌐 Roadmap

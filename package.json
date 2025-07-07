@@ -1,7 +1,7 @@
 {
   "name": "private-gpt",
   "private": true,
-  "type": "module",
+  "type": "commonjs",
   "version": "0.0.0",
   "main": "electron/main.mjs",
   "scripts": {
@@ -14,7 +14,8 @@
     "build:frontend": "vite build",
     "build:backend": "pnpm --prefix backend build",
     "build:electron": "electron-builder",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
     "@fontsource/roboto": "5.2.5",
@@ -76,10 +77,22 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
-      "backend/**/*"
+      "backend/dist/**/*",
+      "node_modules/@fontsource/**/*"
+    ],
+    "extraFiles": [
+      {
+        "from": "dist/node_modules/",
+        "to": "Resources/app/dist/node_modules/"
+      },
+      {
+        "from": "backend/node_modules/",
+        "to": "Resources/app/backend/node_modules/"
+      }
     ],
     "directories": {
       "output": "dist_electron"
-    }
+    },
+    "asar": false
   }
 }
