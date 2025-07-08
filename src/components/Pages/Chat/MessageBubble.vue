@@ -1,17 +1,17 @@
 <script lang="ts" setup>
-  import type { Message } from '@/types/chats';
-  import { useChatStore } from '@/stores/chat';
-  import { useAlert } from '@/plugins/alertPlugin';
-  import { computed, onMounted, ref } from 'vue';
-  import 'highlight.js/styles/default.css';
-  import { parseMarkdown } from '@/utils/markdown';
-  import { useCopyCode } from '@/composables/useCopyCode';
-  import { copyToClipboard } from '@/utils/chatUtils';
-  import AttachmentChip from '@/components/Pages/Chat/AttachmentChip.vue';
-  import ThinkPreview from '@/components/Pages/Chat/ThinkPreview.vue';
-  import { useMemoryStore } from '@/stores/memory.ts';
+import type { Message } from '@/types/chats';
+import { useChatStore } from '@/stores/chat';
+import { useAlert } from '@/plugins/alertPlugin';
+import { computed, onMounted, ref } from 'vue';
+import 'highlight.js/styles/default.css';
+import { parseMarkdown } from '@/utils/markdown';
+import { useCopyCode } from '@/composables/useCopyCode';
+import { copyToClipboard } from '@/utils/chatUtils';
+import AttachmentChip from '@/components/Pages/Chat/AttachmentChip.vue';
+import ThinkPreview from '@/components/Pages/Chat/ThinkPreview.vue';
+import { useMemoryStore } from '@/stores/memory.ts';
 
-  const props = defineProps<{
+const props = defineProps<{
     message: Message;
   }>();
 

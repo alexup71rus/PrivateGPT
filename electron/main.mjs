@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import { existsSync, readFileSync } from 'fs';
 import http, { createServer } from 'http';
 import path from 'path';
@@ -11,19 +11,10 @@ const config = {
   backend: {
     entry: path.join(__dirname, '../backend/dist/main.js'),
     port: 3001,
-    env: {
-      PORT: '3001',
-      CORS_ORIGIN: 'http://localhost:3002',
-    },
+    env: { PORT: '3001', CORS_ORIGIN: 'http://localhost:3002' },
   },
-  frontend: {
-    port: 3002,
-  },
-  window: {
-    width: 1200,
-    height: 800,
-    devHeight: 1200,
-  },
+  frontend: { port: 3002 },
+  window: { width: 1200, height: 800, devHeight: 1200 },
   reloadAttempts: 5,
 };
 
@@ -32,7 +23,6 @@ let frontendServer = null;
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
-  process.exit(0);
 }
 
 app.on('second-instance', () => {
@@ -65,18 +55,16 @@ if (process.argv.includes('--dev') || process.env.NODE_ENV === 'development') {
       res.end(content);
     } catch {
       res.writeHead(404);
-      res.end('Not Found');
+      res.end();
     }
   });
-
   frontendServer.listen(config.frontend.port);
 }
 
 async function startBackend() {
   if (!existsSync(config.backend.entry)) {
-    throw new Error(`Backend entry file not found: ${config.backend.entry}`);
+    throw new Error('Backend entry file not found');
   }
-
   Object.assign(process.env, config.backend.env, { NODE_ENV: 'production' });
   return import(config.backend.entry);
 }
@@ -86,15 +74,13 @@ function waitForBackend(attempts = 20, interval = 1000) {
     const tryConnect = attempt => {
       const req = http.get(`http://localhost:${config.backend.port}/api/tags`, res => {
         if ([200, 400, 404].includes(res.statusCode)) resolve();
-        else if (attempt <= 0) reject(new Error(`Backend not ready, last status: ${res.statusCode || 'none'}`));
+        else if (attempt <= 0) reject(new Error('Backend not ready'));
         else setTimeout(() => tryConnect(attempt - 1), interval);
       });
-
-      req.on('error', err => {
-        if (attempt <= 0) reject(new Error(`Backend not ready: ${err.message}`));
+      req.on('error', () => {
+        if (attempt <= 0) reject(new Error('Backend not ready'));
         else setTimeout(() => tryConnect(attempt - 1), interval);
       });
-
       req.end();
     };
     tryConnect(attempts);
@@ -106,15 +92,13 @@ function waitForVite(attempts = 20, interval = 1000) {
     const tryConnect = attempt => {
       const req = http.get(`http://localhost:${config.frontend.port}`, res => {
         if (res.statusCode === 200) resolve();
-        else if (attempt <= 0) reject(new Error(`Vite server not ready, last status: ${res.statusCode || 'none'}`));
+        else if (attempt <= 0) reject(new Error('Vite server not ready'));
         else setTimeout(() => tryConnect(attempt - 1), interval);
       });
-
-      req.on('error', err => {
-        if (attempt <= 0) reject(new Error(`Vite server not ready: ${err.message}`));
+      req.on('error', () => {
+        if (attempt <= 0) reject(new Error('Vite server not ready'));
         else setTimeout(() => tryConnect(attempt - 1), interval);
       });
-
       req.end();
     };
     tryConnect(attempts);
@@ -132,6 +116,14 @@ function setupIpcHandlers() {
     app.quit();
   });
   ipcMain.handle('backend-port', () => config.backend.port);
+  ipcMain.handle('open-external', async (_, url) => shell.openExternal(url));
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      shell.openExternal(url);
+      return { action: 'deny' };
+    }
+    return { action: 'allow' };
+  });
 }
 
 function createWindow() {
@@ -139,12 +131,10 @@ function createWindow() {
     mainWindow.focus();
     return;
   }
-
   const isDev = process.argv.includes('--dev') || process.env.NODE_ENV === 'development';
   const windowHeight = isDev ? config.window.devHeight : config.window.height;
   const iconPath = process.platform === 'darwin' ? 'electron/logo.icns' : 'electron/logo.ico';
   const iconFullPath = path.join(__dirname, iconPath);
-
   mainWindow = new BrowserWindow({
     width: config.window.width,
     height: windowHeight,
@@ -153,32 +143,25 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: true,
+      sandbox: false,
       preload: path.join(__dirname, 'preload.js'),
     },
   });
-
   const frontendUrl = `http://localhost:${config.frontend.port}`;
   if (isDev) {
-    mainWindow.loadURL(frontendUrl).catch(err => {
-      throw new Error(`Failed to load ${frontendUrl}: ${err.message}`);
-    });
+    mainWindow.loadURL(frontendUrl).catch(() => app.quit());
   } else {
     const distPath = path.join(__dirname, '../dist/index.html');
     if (!existsSync(distPath)) {
-      throw new Error(`Frontend dist file not found: ${distPath}`);
+      app.quit();
     }
     mainWindow.loadFile(distPath);
   }
-
   mainWindow.webContents.on('did-finish-load', () => {
-    if (isDev) {
-      mainWindow.webContents.openDevTools();
-    }
+    if (isDev) mainWindow.webContents.openDevTools();
     mainWindow.webContents.send('backend-port', config.backend.port);
   });
-
-  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+  mainWindow.webContents.on('did-fail-load', () => {
     if (config.reloadAttempts <= 0) {
       app.quit();
       return;
@@ -186,9 +169,7 @@ function createWindow() {
     config.reloadAttempts--;
     setTimeout(() => mainWindow.reload(), 500);
   });
-
   setupIpcHandlers();
-
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -209,7 +190,7 @@ app.whenReady().then(async () => {
       await waitForVite();
     }
     createWindow();
-  } catch (err) {
+  } catch {
     app.quit();
   }
 });
