@@ -36,8 +36,8 @@ export default defineConfig({
         families: [
           {
             name: 'Roboto',
-            weights: [100, 300, 400, 500, 700, 900],
-            styles: ['normal', 'italic'],
+            weights: [400, 500, 700],
+            styles: ['normal'],
           },
         ],
       },
@@ -46,7 +46,7 @@ export default defineConfig({
       policies: {
         'default-src': ["'self'"],
         'connect-src': ["'self'", 'http://localhost:3001'],
-        'font-src': ["'self'", 'data:'],
+        'font-src': ["'self'"],
         'script-src': ["'self'"],
         'style-src': ["'self'", "'unsafe-inline'"],
       },
@@ -90,11 +90,19 @@ export default defineConfig({
     },
   },
   build: {
+    minify: 'esbuild',
+    terserOptions: {
+      compress: { drop_console: true },
+    },
     rollupOptions: {
       output: {
         assetFileNames: 'assets/[name]-[hash][extname]',
+        manualChunks: {
+          vuetify: ['vuetify'],
+          vendor: ['vue', 'vue-router'],
+        },
       },
     },
     assetsInclude: ['**/*.woff', '**/*.woff2'],
-  },
+  }
 });
