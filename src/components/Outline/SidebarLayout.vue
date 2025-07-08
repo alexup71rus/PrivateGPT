@@ -34,8 +34,12 @@ const groupedChats = computed(() => {
     .filter(chat => {
       const matchesSearch = chat.title.toLowerCase().includes(searchQuery.value?.toLowerCase() || '');
       const matchesPrompt = selectedPromptFilter.value
-        ? chat.systemPrompt?.title === selectedPromptFilter.value
+        ? (() => {
+            const prompt = settingsStore.settings.systemPrompts.find(p => p.title === selectedPromptFilter.value);
+            return prompt && chat.systemPrompt ? chat.systemPrompt === prompt.content : false;
+          })()
         : true;
+
       return matchesSearch && matchesPrompt;
     })
     .sort((a, b) => b.timestamp - a.timestamp);
@@ -136,7 +140,6 @@ const setPromptFilter = (promptTitle: string) => {
 
 onMounted(async () => {
   if (!isChatPage.value) {
-    // Если на странице настроек, пробуем загрузить чаты и перейти на чат
     await chat.fetchChats();
     if (chat.chats.length > 0) {
       const latestChat = chat.chats[0];

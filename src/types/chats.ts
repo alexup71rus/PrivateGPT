@@ -1,5 +1,3 @@
-import type { SystemPrompt } from '@/types/settings';
-
 export enum AttachmentType {
   TEXT = 'TEXT',
   IMAGE = 'IMAGE'
@@ -41,7 +39,7 @@ export interface Chat {
   id: string;
   title: string;
   timestamp: number;
-  systemPrompt: SystemPrompt | null;
+  systemPrompt: string | null;
   messages: Message[];
 }
 

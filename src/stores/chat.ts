@@ -173,7 +173,7 @@ export const useChatStore = defineStore('chat', {
         title: this.settings.defaultChatTitle,
         messages: [],
         timestamp: Date.now(),
-        systemPrompt: this.settings.defaultSystemPrompt,
+        systemPrompt: this.settings.defaultSystemPrompt.content,
       };
       this.chats.unshift(newChat);
       this.activeChatId = newChat.id;
@@ -185,8 +185,8 @@ export const useChatStore = defineStore('chat', {
     async setSystemPrompt (chatId: string, systemPrompt: SystemPrompt | null) {
       const chat = this.chats.find(c => c.id === chatId);
       if (chat) {
-        chat.systemPrompt = systemPrompt;
-        await this.persistChatMeta({ id: chatId, systemPrompt: systemPrompt?.content ?? null });
+        chat.systemPrompt = systemPrompt ? systemPrompt.content : null;
+        await this.persistChatMeta({ id: chatId, systemPrompt: chat.systemPrompt });
         this.syncActiveChat();
       }
     },
