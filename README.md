@@ -80,15 +80,6 @@ Or to launch the Electron app:
 pnpm dev:electron
 ```
 
-### ⚠️ Threshold
-
-For Mac on an M-chip:
-
-```bash
-cd backend
-pnpm postinstall
-```
-
 ### 🌐 Roadmap
 
 * 🔍 Better local document indexing and RAG refinement
