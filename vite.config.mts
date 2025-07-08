@@ -4,6 +4,7 @@ import Vue from '@vitejs/plugin-vue';
 import Vuetify, { transformAssetUrls } from 'vite-plugin-vuetify';
 import Fonts from 'unplugin-fonts/vite';
 import VueRouter from 'unplugin-vue-router/vite';
+import csp from 'vite-plugin-csp';
 
 // Utilities
 import { defineConfig } from 'vite';
@@ -11,6 +12,7 @@ import { fileURLToPath, URL } from 'node:url';
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  base: './',
   plugins: [
     VueRouter({
       dts: 'src/typed-router.d.ts',
@@ -38,6 +40,15 @@ export default defineConfig({
             styles: ['normal', 'italic'],
           },
         ],
+      },
+    }),
+    csp({
+      policies: {
+        'default-src': ["'self'"],
+        'connect-src': ["'self'", 'http://localhost:3001'],
+        'font-src': ["'self'", 'data:'],
+        'script-src': ["'self'"],
+        'style-src': ["'self'", "'unsafe-inline'"],
       },
     }),
   ],

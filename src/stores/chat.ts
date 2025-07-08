@@ -68,7 +68,7 @@ export const useChatStore = defineStore('chat', {
     async syncActiveChat () {
       const chat = this.chats.find(chat => chat.id === this.activeChatId);
       if (chat) {
-        this.activeChat = { ...chat, messages: [...chat.messages] };
+        this.activeChat = { ...chat, messages: [...(chat.messages || [])] };
       } else {
         this.activeChat = null;
       }

@@ -35,6 +35,9 @@ importers:
       abort-controller:
         specifier: ^3.0.0
         version: 3.0.0
+      app-root-path:
+        specifier: ^3.1.0
+        version: 3.1.0
       cheerio:
         specifier: ^1.0.0
         version: 1.1.0

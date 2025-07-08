@@ -36,7 +36,6 @@ export class RagService {
         model: embeddingsModel,
         prompt: content,
       });
-      console.log('Ollama response:', response.data);
       const embedding = this.embeddingRepository.create({
         filename: file.filename,
         embeddings: response.data.embedding,

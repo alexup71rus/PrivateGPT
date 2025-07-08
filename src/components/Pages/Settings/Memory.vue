@@ -1,13 +1,13 @@
 <script lang="ts" setup>
-  import { computed, ref } from 'vue';
-  import { useMemoryStore } from '@/stores/memory';
-  import { useSettingsStore } from '@/stores/settings';
-  import { useChatStore } from '@/stores/chat';
-  import { useAlert } from '@/plugins/alertPlugin';
-  import type { MemoryEntry } from '@/types/chats.ts';
-  import type { ISettings } from '@/types/settings.ts';
+import { computed, ref } from 'vue';
+import { useMemoryStore } from '@/stores/memory';
+import { useSettingsStore } from '@/stores/settings';
+import { useChatStore } from '@/stores/chat';
+import { useAlert } from '@/plugins/alertPlugin';
+import type { MemoryEntry } from '@/types/chats.ts';
+import type { ISettings } from '@/types/settings.ts';
 
-  const memoryStore = useMemoryStore();
+const memoryStore = useMemoryStore();
   const settingsStore = useSettingsStore();
   const chatStore = useChatStore();
   const { showSnackbar } = useAlert();
@@ -46,12 +46,10 @@
     }
     try {
       if (editingMemory.value?.id) {
-        console.log('Updating memory with ID:', editingMemory.value.id);
         await memoryStore.updateMemory(editingMemory.value.id, newMemoryContent.value);
         showSnackbar({ message: 'Memory updated', type: 'success' });
         editingMemory.value = null;
       } else {
-        console.log('Adding new memory');
         await memoryStore.addMemory(newMemoryContent.value);
         showSnackbar({ message: 'Memory added', type: 'success' });
       }
@@ -70,7 +68,6 @@
     }
     editingMemory.value = entry;
     newMemoryContent.value = entry.content;
-    console.log('Editing memory:', entry);
   };
 
   const deleteMemory = async (id: number) => {

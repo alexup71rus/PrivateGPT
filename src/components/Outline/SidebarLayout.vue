@@ -1,128 +1,155 @@
 <script lang="ts" setup>
-  import { useChatStore } from '@/stores/chat.ts';
-  import { computed, onMounted, ref } from 'vue';
-  import { useRoute, useRouter } from 'vue-router';
-  import { useChatActions } from '@/composables/useChatActions.ts';
-  import { useAppStore } from '@/stores/app.ts';
-  import { useAlert } from '@/plugins/alertPlugin.ts';
-  import { useDeleteButton } from '@/composables/useDeleteButton.ts';
-  import type { Chat } from '@/types/chats.ts';
-  import { useSettingsStore } from '@/stores/settings.ts';
-  import { formatDate } from '../../utils/chatUtils.ts';
+import { useChatStore } from '@/stores/chat.ts';
+import { computed, onMounted, ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { useChatActions } from '@/composables/useChatActions.ts';
+import { useAppStore } from '@/stores/app.ts';
+import { useAlert } from '@/plugins/alertPlugin.ts';
+import { useDeleteButton } from '@/composables/useDeleteButton.ts';
+import type { Chat } from '@/types/chats.ts';
+import { useSettingsStore } from '@/stores/settings.ts';
+import { formatDate } from '@/utils/chatUtils.ts';
+import { useAppRouting } from '@/composables/useAppRouting.ts';
 
-  const props = defineProps<{
-    isChatPage: boolean;
-  }>();
+const props = defineProps<{
+  isChatPage: boolean;
+}>();
 
-  const route = useRoute();
-  const router = useRouter();
-  const app = useAppStore();
-  const chat = useChatStore();
-  const settingsStore = useSettingsStore();
-  const { showSnackbar, showConfirm } = useAlert();
-  const { onNewChat, selectChat, deleteChat } = useChatActions();
-  const { handleFirstClick, handleSecondClick, resetDeletePending, isPending } = useDeleteButton(deleteChat);
+const route = useRoute();
+const router = useRouter();
+const { isChatPage } = useAppRouting();
+const app = useAppStore();
+const chat = useChatStore();
+const settingsStore = useSettingsStore();
+const { showSnackbar, showConfirm } = useAlert();
+const { onNewChat, selectChat, deleteChat } = useChatActions();
+const { handleFirstClick, handleSecondClick, resetDeletePending, isPending } = useDeleteButton(deleteChat);
 
-  const searchQuery = ref<string>('');
-  const selectedPromptFilter = ref<string | null>(null);
+const searchQuery = ref<string>('');
+const selectedPromptFilter = ref<string | null>(null);
 
-  const groupedChats = computed(() => {
-    const groups: { [key: string]: Chat[] } = {};
-    const sortedChats = [...chat.chats]
-      .filter(chat => {
-        const matchesSearch = chat.title.toLowerCase().includes(searchQuery.value?.toLowerCase() || '');
-        const matchesPrompt = selectedPromptFilter.value
-          ? chat.systemPrompt?.title === selectedPromptFilter.value
-          : true;
-        return matchesSearch && matchesPrompt;
-      })
-      .sort((a, b) => b.timestamp - a.timestamp);
+const groupedChats = computed(() => {
+  const groups: { [key: string]: Chat[] } = {};
+  const sortedChats = [...chat.chats]
+    .filter(chat => {
+      const matchesSearch = chat.title.toLowerCase().includes(searchQuery.value?.toLowerCase() || '');
+      const matchesPrompt = selectedPromptFilter.value
+        ? chat.systemPrompt?.title === selectedPromptFilter.value
+        : true;
+      return matchesSearch && matchesPrompt;
+    })
+    .sort((a, b) => b.timestamp - a.timestamp);
 
-    sortedChats.forEach(chat => {
-      const date = new Date(chat.timestamp);
-      const dateKey = date.toDateString();
-      if (!groups[dateKey]) {
-        groups[dateKey] = [];
-      }
-      groups[dateKey].push(chat);
-    });
-
-    return Object.entries(groups).map(([dateKey, chats]) => ({
-      date: new Date(dateKey),
-      chats,
-    }));
+  sortedChats.forEach(chat => {
+    const date = new Date(chat.timestamp);
+    const dateKey = date.toDateString();
+    if (!groups[dateKey]) {
+      groups[dateKey] = [];
+    }
+    groups[dateKey].push(chat);
   });
 
-  const menuItems = [
-    { title: 'General', path: '/settings', icon: 'mdi-cog' },
-    { title: 'Search', path: '/settings/search', icon: 'mdi-magnify' },
-    { title: 'Memory', path: '/settings/memory', icon: 'mdi-memory' },
-    { title: 'RAG', path: '/settings/rag', icon: 'mdi-database' },
-  ];
-  const isActive = (path: string) => route.path === path;
+  return Object.entries(groups).map(([dateKey, chats]) => ({
+    date: new Date(dateKey),
+    chats,
+  }));
+});
 
-  const handleChatClick = (id: string) => {
-    selectChat(id);
-  };
+const menuItems = [
+  { title: 'General', path: '/settings', icon: 'mdi-cog' },
+  { title: 'Search', path: '/settings/search', icon: 'mdi-magnify' },
+  { title: 'Memory', path: '/settings/memory', icon: 'mdi-memory' },
+  { title: 'RAG', path: '/settings/rag', icon: 'mdi-database' },
+];
+const isActive = (path: string) => route.path === path;
 
-  const toggleSettings = async () => {
-    if (props.isChatPage) {
-      router.push(`/settings`);
+const handleChatClick = (id: string) => {
+  selectChat(id);
+};
+
+const toggleSettings = async () => {
+  if (props.isChatPage) {
+    router.push(`/settings`);
+  } else {
+    if (!chat.chats?.length) {
+      await chat.fetchChats();
+    }
+
+    const activeChat = chat.activeChat;
+
+    if (activeChat) {
+      router.push(`/#${activeChat.id}`);
+    } else if (chat.chats?.length > 0 && chat.chats[chat.chats.length - 1]?.messages?.length === 0) {
+      selectChat(chat.chats[chat.chats.length - 1].id);
     } else {
-      if (!chat.chats?.length) {
-        await chat.fetchChats();
-      }
-
-      const activeChat = chat.activeChat;
-
-      if (activeChat) {
-        router.push(`/#${activeChat.id}`);
-      } else if (chat.chats[chat.chats.length - 1].messages.length === 0) {
-        selectChat(chat.chats[chat.chats.length - 1].id);
-      } else {
-        onNewChat();
-      }
+      await onNewChat();
     }
-  };
+  }
+};
 
-  const initializeChat = () => {
-    const hash = window.location.hash.slice(1);
-    if (hash && chat.chats.some(chat => chat.id === hash)) {
-      selectChat(hash);
-      return;
-    }
+const initializeChat = async () => {
+  if (!chat.chats?.length) {
+    await chat.fetchChats();
+  }
 
+  const hash = window.location.hash.slice(1);
+  if (hash && chat.chats.some(chat => chat.id === hash)) {
+    selectChat(hash);
+    router.push(`/#${hash}`);
+    return;
+  }
+
+  if (chat.chats.length > 0) {
+    const latestChat = chat.chats[0];
+    selectChat(latestChat.id);
+    router.push(`/#${latestChat.id}`);
+  } else {
+    await onNewChat();
+    router.push('/');
+  }
+};
+
+const removeAllChats = async () => {
+  showConfirm({
+    title: 'Warning',
+    message: 'Are you sure you want to delete all chats?',
+    buttons: [
+      { text: 'Yes', color: 'warning', value: true },
+      { text: 'Cancel', color: 'white', value: false },
+    ],
+    resolve: res => {
+      if (res) {
+        chat.clearChats();
+        showSnackbar({ message: 'All chats deleted successfully', type: 'success' });
+      }
+    },
+  });
+};
+
+const clearPromptFilter = () => {
+  selectedPromptFilter.value = null;
+};
+
+const setPromptFilter = (promptTitle: string) => {
+  selectedPromptFilter.value = promptTitle;
+};
+
+onMounted(async () => {
+  if (!isChatPage.value) {
+    // Если на странице настроек, пробуем загрузить чаты и перейти на чат
+    await chat.fetchChats();
     if (chat.chats.length > 0) {
-      selectChat(chat.chats[0].id);
+      const latestChat = chat.chats[0];
+      selectChat(latestChat.id);
+      router.push(`/#${latestChat.id}`);
+    } else {
+      await onNewChat();
+      router.push('/');
     }
-  };
-
-  const removeAllChats = async () => {
-    showConfirm({
-      title: 'Warning',
-      message: 'Are you sure you want to delete all chats?',
-      buttons: [
-        { text: 'Yes', color: 'warning', value: true },
-        { text: 'Cancel', color: 'white', value: false },
-      ],
-      resolve: res => {
-        if (res) {
-          chat.clearChats();
-          showSnackbar({ message: 'All chats deleted successfully', type: 'success' });
-        }
-      },
-    });
-  };
-
-  const clearPromptFilter = () => {
-    selectedPromptFilter.value = null;
-  };
-
-  const setPromptFilter = (promptTitle: string) => {
-    selectedPromptFilter.value = promptTitle;
-  };
-
-  onMounted(initializeChat);
+  } else {
+    initializeChat();
+  }
+});
 </script>
 
 <template>

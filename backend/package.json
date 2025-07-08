@@ -29,6 +29,7 @@
     "@sqltools/formatter": "^1.2.5",
     "@types/http-proxy-middleware": "^1.0.0",
     "abort-controller": "^3.0.0",
+    "app-root-path": "^3.1.0",
     "cheerio": "^1.0.0",
     "chromadb": "^3.0.3",
     "graphql": "^16.11.0",

@@ -13,21 +13,31 @@ import { LinkParserModule } from './link-parser/link-parser.module';
 import { WebUtilsModule } from './web-utils/web-utils.module';
 import { RagModule } from './rag/rag.module';
 
+const isElectron = process.versions.electron !== undefined;
+const basePath: string = (() => {
+  try {
+    const { app } = require('electron');
+    return isElectron ? app.getPath('userData') : process.cwd();
+  } catch {
+    return process.cwd();
+  }
+})();
+
 @Module({
   imports: [
     GraphQLModule.forRoot<ApolloDriverConfig>({
       driver: ApolloDriver,
-      autoSchemaFile: join(process.cwd(), 'src/schema.gql'),
+      autoSchemaFile: join(basePath, 'schema.gql'),
       playground: true,
-      context: ({ req }) => ({ req }),
+      context: ({ req }: { req: unknown }) => ({ req }),
       installSubscriptionHandlers: true,
     }),
     TypeOrmModule.forRoot({
       type: 'sqljs',
       database: new Uint8Array(),
-      location: join(process.cwd(), 'db.sqlite'),
+      location: join(basePath, 'db.sqlite'),
       autoSave: true,
-      entities: [__dirname + '/**/*.entity{.ts,.js}'],
+      entities: [`${__dirname}/**/*.entity{.ts,.js}`],
       synchronize: true, // TODO: use migrations
     }),
 

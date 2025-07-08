@@ -4,79 +4,89 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import { graphqlUploadExpress } from 'graphql-upload-ts';
 import { createProxyMiddleware } from 'http-proxy-middleware';
-import { ServerResponse } from 'http';
+import { IncomingMessage, ServerResponse } from 'http';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const isElectron = process.versions.electron !== undefined;
+  let basePath: string;
+  try {
+    const { app } = await import('electron');
+    basePath = isElectron ? app.getPath('userData') : process.cwd();
+  } catch {
+    basePath = process.cwd();
+  }
+
+  const nestApp = await NestFactory.create<NestExpressApplication>(AppModule);
   const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3002')
     .split(',')
     .map((s) => s.trim());
-  const defaultOllamaUrl =
-    process.env.OLLAMA_URL || 'http://192.168.0.126:11434';
 
-  app.use('/api', (req, res, next) => {
-    const ollamaUrl = req.headers['x-ollama-url'] || defaultOllamaUrl;
+  nestApp.use(
+    '/api',
+    (req: IncomingMessage, res: ServerResponse, next: () => void) => {
+      const ollamaUrl = req.headers['x-ollama-url'] as string | undefined;
 
-    if (req.method === 'OPTIONS') {
-      const origin =
-        req.headers.origin && allowedOrigins.includes(req.headers.origin)
-          ? req.headers.origin
-          : allowedOrigins[0];
-      res
-        .status(204)
-        .set({
-          'Access-Control-Allow-Origin': origin,
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS, PUT, DELETE',
-          'Access-Control-Allow-Headers': '*',
-        })
-        .end();
-      return;
-    }
+      if (req.method === 'OPTIONS') {
+        const origin =
+          req.headers.origin && allowedOrigins.includes(req.headers.origin)
+            ? req.headers.origin
+            : allowedOrigins[0];
+        res
+          .writeHead(204, {
+            'Access-Control-Allow-Origin': origin,
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS, PUT, DELETE',
+            'Access-Control-Allow-Headers': '*',
+          })
+          .end();
+        return;
+      }
 
-    try {
-      new URL(ollamaUrl);
-    } catch (err) {
-      console.error(
-        `Invalid x-ollama-url: ${ollamaUrl}, Error: ${err.message}`,
-      );
-      res.status(400).send('Invalid x-ollama-url');
-      return;
-    }
+      if (!ollamaUrl) {
+        res.writeHead(400).end('Missing x-ollama-url');
+        return;
+      }
 
-    const proxy = createProxyMiddleware({
-      target: ollamaUrl,
-      changeOrigin: true,
-      pathRewrite: (path) => `/api${path.replace(/^\/api/, '')}`,
-      on: {
-        proxyRes: (proxyRes, req) => {
-          const origin =
-            req.headers.origin && allowedOrigins.includes(req.headers.origin)
-              ? req.headers.origin
-              : allowedOrigins[0];
-          proxyRes.headers['Access-Control-Allow-Origin'] = origin;
-          proxyRes.headers['Access-Control-Allow-Methods'] =
-            'GET, POST, OPTIONS, PUT, DELETE';
-          proxyRes.headers['Access-Control-Allow-Headers'] = '*';
+      try {
+        new URL(ollamaUrl);
+      } catch (err) {
+        res.writeHead(400).end(`Invalid x-ollama-url: ${err.message}`);
+        return;
+      }
+
+      const proxy = createProxyMiddleware({
+        target: ollamaUrl,
+        changeOrigin: true,
+        pathRewrite: (path) => `/api${path.replace(/^\/api/, '')}`,
+        on: {
+          proxyRes: (proxyRes, req) => {
+            const origin =
+              req.headers.origin && allowedOrigins.includes(req.headers.origin)
+                ? req.headers.origin
+                : allowedOrigins[0];
+            proxyRes.headers['Access-Control-Allow-Origin'] = origin;
+            proxyRes.headers['Access-Control-Allow-Methods'] =
+              'GET, POST, OPTIONS, PUT, DELETE';
+            proxyRes.headers['Access-Control-Allow-Headers'] = '*';
+            delete proxyRes.headers['access-control-allow-origin'];
+          },
+          error: (err, _req, res: ServerResponse) => {
+            res.writeHead(500).end('Proxy error');
+          },
         },
-        error: (err, req, res: ServerResponse) => {
-          console.error(`Proxy error: ${err.message}`);
-          res.statusCode = 500;
-          res.end('Proxy error');
-        },
-      },
-    });
+      });
 
-    proxy(req, res, next);
-  });
+      proxy(req, res, next);
+    },
+  );
 
-  app.use(
+  nestApp.use(
     graphqlUploadExpress({ maxFileSize: 50 * 1024 * 1024, maxFiles: 10 }),
   );
-  app.useStaticAssets(join(process.cwd(), 'Uploads'), { prefix: '/Uploads' });
-  app.enableCors({ origin: allowedOrigins });
+  nestApp.useStaticAssets(join(basePath, 'Uploads'), { prefix: '/uploads' });
+  nestApp.enableCors({ origin: allowedOrigins });
 
-  const port = process.env.PORT || 3001;
-  await app.listen(port);
+  const port = parseInt(process.env.PORT || '3001', 10);
+  await nestApp.listen(port);
 }
 
 bootstrap();
