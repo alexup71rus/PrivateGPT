@@ -2,7 +2,7 @@ import type { Chat, MemoryEntry } from '@/types/chats.ts';
 
 export async function openDB (): Promise<IDBDatabase> {
   return new Promise<IDBDatabase>((resolve, reject) => {
-    const request: IDBOpenDBRequest = indexedDB.open('PrivateGPT', 1);
+    const request: IDBOpenDBRequest = indexedDB.open('plama', 1);
     request.onupgradeneeded = (event: IDBVersionChangeEvent) => {
       const db: IDBDatabase = (event.target as IDBOpenDBRequest).result;
       db.createObjectStore('chats', { keyPath: 'id' });
@@ -29,11 +29,11 @@ export async function loadChats (): Promise<Chat[]> {
     });
   } catch (error) {
     console.error('Error loading chats from IndexedDB:', error);
-    const chats = localStorage.getItem('privateGPTChats');
+    const chats = localStorage.getItem('plamaChats');
     if (chats) {
       const result: Chat[] = JSON.parse(chats);
       await saveChats(result);
-      localStorage.removeItem('privateGPTChats');
+      localStorage.removeItem('plamaChats');
       return result;
     }
     return [];
@@ -154,11 +154,11 @@ export async function loadMemory (): Promise<MemoryEntry[]> {
     });
   } catch (error) {
     console.error('Error loading memory from IndexedDB:', error);
-    const memory = localStorage.getItem('privateGPTMemory');
+    const memory = localStorage.getItem('plamaMemory');
     if (memory) {
       const result: MemoryEntry[] = JSON.parse(memory);
       await saveMemory(result);
-      localStorage.removeItem('privateGPTMemory');
+      localStorage.removeItem('plamaMemory');
       return result;
     }
     return [];

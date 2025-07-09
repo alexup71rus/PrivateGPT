@@ -1,11 +1,11 @@
 <script lang="ts" setup>
-  import { computed, ref, watch } from 'vue';
-  import { useChatStore } from '@/stores/chat.ts';
-  import { useChatScroll } from '@/composables/useChatScroll.ts';
-  import { useAppStore } from '@/stores/app.ts';
-  import { throttle } from '@/utils/helpers.ts';
+import { computed, ref, watch } from 'vue';
+import { useChatStore } from '@/stores/chat.ts';
+import { useChatScroll } from '@/composables/useChatScroll.ts';
+import { useAppStore } from '@/stores/app.ts';
+import { throttle } from '@/utils/helpers.ts';
 
-  const app = useAppStore();
+const app = useAppStore();
   const chat = useChatStore();
   const chatTitle = ref(chat.activeChat?.title ?? '');
   const messages = computed(() => chat.activeChat?.messages ?? []);
@@ -44,7 +44,7 @@
             v-bind="props"
             class="github-button"
             color="grey-darken-1"
-            href="https://github.com/alexup71rus/PrivateGPT"
+            href="https://github.com/alexup71rus/plama"
             icon="mdi-github"
             target="_blank"
             variant="text"
@@ -73,8 +73,7 @@
       <template v-else>
         <div class="chat-logo">
           <img alt="Chat logo" src="@/assets/logo.svg">
-          <hr>
-          <h2>PrivateGPT</h2>
+          <h2>plama</h2>
         </div>
       </template>
     </div>

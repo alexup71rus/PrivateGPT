@@ -1,5 +1,5 @@
 {
-  "name": "private-gpt",
+  "name": "plama",
   "private": true,
   "type": "commonjs",
   "version": "0.1.1",
@@ -73,8 +73,8 @@
     ]
   },
   "build": {
-    "appId": "com.example.privategpt",
-    "productName": "PrivateGPT",
+    "appId": "com.example.plama",
+    "productName": "Plama",
     "files": [
       "!dist/**/*.spec.js",
       "!dist/**/*.map",

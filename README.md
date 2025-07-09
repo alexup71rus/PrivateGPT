@@ -1,8 +1,8 @@
-**PrivateGPT** is a local AI client replicating the functionality of ChatGPT, Grok, and Yandex Alice — but fully private and self-hosted.
+**Plama** is a local AI client replicating the functionality of ChatGPT, Grok, and Yandex Alice — but fully private and self-hosted.
 
 <img src="./src/assets/logo.svg" alt="Logo" width="100" />
 
-### 💡 Why PrivateGPT?
+### 💡 Why Plama?
 
 > A full-featured local AI client with private memory, fast search, flexible prompts, and a clean codebase you can extend freely.
 
@@ -89,7 +89,7 @@ pnpm dev:electron
 
 ### 📄 License
 
-[Apache License](https://github.com/alexup71rus/PrivateGPT/blob/master/LICENSE)
+[Apache License](https://github.com/alexup71rus/plama/blob/master/LICENSE)
 
 ### 📧 Contact
 

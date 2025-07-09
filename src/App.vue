@@ -1,15 +1,15 @@
 <script lang="ts" setup>
-  import AlertProvider from '@/components/Providers/AlertProvider.vue';
-  import { useChatStore } from '@/stores/chat.ts';
-  import { nextTick, onMounted, ref } from 'vue';
-  import { useAppRouting } from '@/composables/useAppRouting.ts';
-  import { useAppStore } from '@/stores/app.ts';
-  import { useChatActions } from '@/composables/useChatActions.ts';
-  import { useSettingsStore } from '@/stores/settings.ts';
-  import { useMemoryStore } from '@/stores/memory.ts';
-  import { waitForBackend } from '@/api/chats.ts';
+import AlertProvider from '@/components/Providers/AlertProvider.vue';
+import { useChatStore } from '@/stores/chat.ts';
+import { nextTick, onMounted, ref } from 'vue';
+import { useAppRouting } from '@/composables/useAppRouting.ts';
+import { useAppStore } from '@/stores/app.ts';
+import { useChatActions } from '@/composables/useChatActions.ts';
+import { useSettingsStore } from '@/stores/settings.ts';
+import { useMemoryStore } from '@/stores/memory.ts';
+import { waitForBackend } from '@/api/chats.ts';
 
-  const app = useAppStore();
+const app = useAppStore();
   const chat = useChatStore();
   const memory = useMemoryStore();
   const settingsStore = useSettingsStore();
@@ -63,7 +63,7 @@
       density="compact"
       flat
     >
-      <v-toolbar-title>PrivateGPT</v-toolbar-title>
+      <v-toolbar-title>Plama</v-toolbar-title>
       <v-spacer />
       <v-btn icon size="small" @click="minimizeWindow">
         <v-icon>mdi-window-minimize</v-icon>

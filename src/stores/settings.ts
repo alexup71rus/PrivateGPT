@@ -5,7 +5,7 @@ import { getRagFiles } from '@/api/chats.ts';
 
 export const useSettingsStore = defineStore('settings', {
   state: () => {
-    const saved = localStorage.getItem('privateGPTSettings');
+    const saved = localStorage.getItem('plamaSettings');
     const parsed = saved ? JSON.parse(saved) : {};
 
     if (!parsed.systemPrompts || !Array.isArray(parsed.systemPrompts)) {
@@ -58,7 +58,7 @@ export const useSettingsStore = defineStore('settings', {
     updateSettings (updates: Partial<ISettings>) {
       Object.assign(this.settings, updates);
       try {
-        localStorage.setItem('privateGPTSettings', JSON.stringify(this.settings));
+        localStorage.setItem('plamaSettings', JSON.stringify(this.settings));
       } catch (error) {
         console.error('Failed to save settings to localStorage:', error);
       }
@@ -66,7 +66,7 @@ export const useSettingsStore = defineStore('settings', {
     resetSettings () {
       Object.assign(this.settings, { ...DEFAULT_SETTINGS });
       try {
-        localStorage.setItem('privateGPTSettings', JSON.stringify(this.settings));
+        localStorage.setItem('plamaSettings', JSON.stringify(this.settings));
       } catch (error) {
         console.error('Failed to save settings to localStorage:', error);
       }
