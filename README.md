@@ -82,6 +82,7 @@ pnpm dev:electron
 
 ### 🌐 Roadmap
 
+* ✅ Daily Task Planning & News Digest
 * 🔍 Better local document indexing and RAG refinement
 * 🎤 Optional voice input/output (speech-to-text + TTS)
 * ⚖️ API integration support (external tools or agents)
