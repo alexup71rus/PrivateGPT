@@ -89,7 +89,7 @@ pnpm dev:electron
 
 ### 📄 License
 
-[Apache License](https://github.com/alexup71rus/plama/blob/master/LICENSE)
+[License](https://github.com/alexup71rus/plama/blob/master/LICENSE)
 
 ### 📧 Contact
 

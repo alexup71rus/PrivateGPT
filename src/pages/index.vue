@@ -73,7 +73,6 @@ const app = useAppStore();
       <template v-else>
         <div class="chat-logo">
           <img alt="Chat logo" src="@/assets/logo.svg">
-          <h2>plama</h2>
         </div>
       </template>
     </div>
