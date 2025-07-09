@@ -87,10 +87,6 @@ pnpm dev:electron
 * ⚖️ API integration support (external tools or agents)
 * 🌍 Interface multilingual support
 
-### 📄 License
-
-[Apache License](https://github.com/alexup71rus/PrivateGPT/blob/master/LICENSE)
-
-### 📧 Contact
+[License](https://github.com/alexup71rus/PrivateGPT/blob/master/LICENSE)
 
 TG: [@alexup71rus](https://t.me/alexup71rus)
