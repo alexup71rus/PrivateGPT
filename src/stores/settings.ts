@@ -1,26 +1,15 @@
 import { defineStore } from 'pinia';
 import { reactive, ref } from 'vue';
-import { DEFAULT_SETTINGS, type ISettings } from '@/types/settings.ts';
 import { getRagFiles } from '@/api/chats.ts';
+import { loadSettings, resetSettings, saveSettings } from '@/api/settings.ts';
+import { DEFAULT_SETTINGS, type ISettings } from '../types/settings.ts';
 
 export const useSettingsStore = defineStore('settings', {
-  state: () => {
-    const saved = localStorage.getItem('plamaSettings');
-    const parsed = saved ? JSON.parse(saved) : {};
-
-    if (!parsed.systemPrompts || !Array.isArray(parsed.systemPrompts)) {
-      parsed.systemPrompts = DEFAULT_SETTINGS.systemPrompts;
-    }
-
-    const settings: ISettings = reactive({ ...DEFAULT_SETTINGS, ...parsed });
-    const isLoadedRag = ref(false);
-
-    return {
-      settings,
-      systemThemeDark: window.matchMedia('(prefers-color-scheme: dark)').matches,
-      isLoadedRag,
-    };
-  },
+  state: () => ({
+    settings: reactive({ ...DEFAULT_SETTINGS }),
+    systemThemeDark: window.matchMedia('(prefers-color-scheme: dark)').matches,
+    isLoadedRag: ref(false),
+  }),
   getters: {
     isDarkTheme: state => {
       if (state.settings.theme === 'system') {
@@ -30,7 +19,11 @@ export const useSettingsStore = defineStore('settings', {
     },
   },
   actions: {
-    async init () {
+    async init() {
+      const loaded = await loadSettings();
+      if (loaded) {
+        Object.assign(this.settings, loaded);
+      }
       await this.loadRagFiles();
       this.initThemeListener();
     },
@@ -55,21 +48,13 @@ export const useSettingsStore = defineStore('settings', {
         console.error('Failed to load RAG files:', error);
       }
     },
-    updateSettings (updates: Partial<ISettings>) {
+    updateSettings(updates: Partial<ISettings>) {
       Object.assign(this.settings, updates);
-      try {
-        localStorage.setItem('plamaSettings', JSON.stringify(this.settings));
-      } catch (error) {
-        console.error('Failed to save settings to localStorage:', error);
-      }
+      saveSettings(this.settings);
     },
-    resetSettings () {
+    resetSettings() {
       Object.assign(this.settings, { ...DEFAULT_SETTINGS });
-      try {
-        localStorage.setItem('plamaSettings', JSON.stringify(this.settings));
-      } catch (error) {
-        console.error('Failed to save settings to localStorage:', error);
-      }
+      resetSettings();
     },
   },
 });

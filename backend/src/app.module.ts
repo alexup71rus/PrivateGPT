@@ -12,6 +12,7 @@ import { MemoryModule } from './memory/memory.module';
 import { LinkParserModule } from './link-parser/link-parser.module';
 import { WebUtilsModule } from './web-utils/web-utils.module';
 import { RagModule } from './rag/rag.module';
+import { SettingsModule } from './settings/settings.module';
 
 const isElectron = process.versions.electron !== undefined;
 const basePath: string = (() => {
@@ -47,6 +48,7 @@ const basePath: string = (() => {
     SearchModule,
     LinkParserModule,
     RagModule,
+    SettingsModule,
   ],
   controllers: [AppController],
   providers: [AppService, AppResolver],

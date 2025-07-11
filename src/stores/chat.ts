@@ -25,7 +25,7 @@ import {
   handleError,
   processStream,
 } from '@/utils/helpers.ts';
-import { type ISettings, type SystemPrompt } from '@/types/settings.ts';
+import { type ISettings } from '../types/settings.ts';
 import { useSettingsStore } from '@/stores/settings.ts';
 import { useMemoryStore } from '@/stores/memory.ts';
 import type { SearchResultItem } from '../../backend/src/search/search.service.ts';
@@ -298,7 +298,6 @@ export const useChatStore = defineStore('chat', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Ollama-URL': this.settings.ollamaURL,
           },
           url: `${this.settings.backendURL}/api/chat`,
           data: {
@@ -369,7 +368,6 @@ export const useChatStore = defineStore('chat', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'X-Ollama-URL': this.settings.ollamaURL,
               },
               url: `${this.settings.backendURL}/api/chat`,
               data: {
@@ -485,7 +483,6 @@ export const useChatStore = defineStore('chat', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Ollama-URL': this.settings.ollamaURL,
           },
           body: JSON.stringify(body),
           signal: this.abortController.signal,
@@ -707,9 +704,6 @@ export const useChatStore = defineStore('chat', {
         const response = await this.http.request<OllamaTagsResponse>({
           method: 'GET',
           url: `${this.settings.backendURL}/api/tags`,
-          headers: {
-            'X-Ollama-URL': this.settings.ollamaURL,
-          },
         });
         this.models = response.models || [];
         return this.models;

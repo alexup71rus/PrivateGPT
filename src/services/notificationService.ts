@@ -9,7 +9,7 @@ export class NotificationService {
   private flashInterval: number | null = null;
   private resetTimeout: number | null = null;
   private isNotifyIcon: boolean = true;
-  private checkInterval = 10000; // Для теста 10с; в prod 60000
+  private checkInterval = 10000;
   private flashDuration = 120000;
   private flashSpeed = 500;
 

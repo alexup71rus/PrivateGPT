@@ -5,6 +5,7 @@ import { join } from 'path';
 import { graphqlUploadExpress } from 'graphql-upload-ts';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { IncomingMessage, ServerResponse } from 'http';
+import { SettingsService } from './settings/settings.service';
 
 async function bootstrap() {
   const isElectron = process.versions.electron !== undefined;
@@ -17,15 +18,15 @@ async function bootstrap() {
   }
 
   const nestApp = await NestFactory.create<NestExpressApplication>(AppModule);
+  const settingsService = nestApp.get(SettingsService);
+
   const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3002')
     .split(',')
     .map((s) => s.trim());
 
   nestApp.use(
     '/api',
-    (req: IncomingMessage, res: ServerResponse, next: () => void) => {
-      const ollamaUrl = req.headers['x-ollama-url'] as string | undefined;
-
+    async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
       if (req.method === 'OPTIONS') {
         const origin =
           req.headers.origin && allowedOrigins.includes(req.headers.origin)
@@ -41,15 +42,18 @@ async function bootstrap() {
         return;
       }
 
+      const settingsEntity = await settingsService.getSettings();
+      const ollamaUrl = settingsEntity.settings.ollamaURL;
+
       if (!ollamaUrl) {
-        res.writeHead(400).end('Missing x-ollama-url');
+        res.writeHead(400).end('Missing ollamaURL in settings');
         return;
       }
 
       try {
         new URL(ollamaUrl);
-      } catch (err) {
-        res.writeHead(400).end(`Invalid x-ollama-url: ${err.message}`);
+      } catch (err: any) {
+        res.writeHead(400).end(`Invalid ollamaURL: ${err.message}`);
         return;
       }
 

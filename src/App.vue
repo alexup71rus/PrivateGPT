@@ -10,24 +10,28 @@ import { useMemoryStore } from '@/stores/memory.ts';
 import { waitForBackend } from '@/api/chats.ts';
 import { notificationService } from '@/services/notificationService';
 
+const settingsStore = useSettingsStore();
 const app = useAppStore();
 const chat = useChatStore();
 const memory = useMemoryStore();
-const settingsStore = useSettingsStore();
 const { isChatPage } = useAppRouting();
 const { initFromHash } = useChatActions();
 
-
 const isElectron = !!(window as any).electronAPI;
 const isLoaded = ref(false);
+
 onMounted(async () => {
-  await chat.checkOllamaConnection();
-  await waitForBackend();
-  await chat.fetchModels();
-  await memory.fetchMemory();
   await settingsStore.init();
 
-  notificationService.start()
+  // Proceed with other async operations
+  await Promise.all([
+    chat.checkOllamaConnection(),
+    waitForBackend(),
+    chat.fetchModels(),
+    memory.fetchMemory(),
+  ]);
+
+  notificationService.start();
 
   if (chat.error || window.location.pathname !== '/') {
     isLoaded.value = true;

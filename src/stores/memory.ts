@@ -2,9 +2,9 @@ import { defineStore } from 'pinia';
 import { useHttpService } from '@/plugins/httpPlugin';
 import { deleteMemoryEntry, loadMemory, saveMemory, waitForBackend } from '@/api/chats';
 import { type MemoryEntry, type Message } from '@/types/chats.ts';
-import type { ISettings } from '@/types/settings.ts';
 import { useSettingsStore } from '@/stores/settings.ts';
 import { extractStringFromResponse } from '@/utils/helpers.ts';
+import { type ISettings } from '../types/settings.ts';
 
 export interface MemoryState {
   http: ReturnType<typeof useHttpService>['http'];
@@ -102,7 +102,6 @@ export const useMemoryStore = defineStore('memory', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Ollama-URL': this.settings.ollamaURL,
           },
           url: `${this.settings.backendURL}/api/chat`,
           data: {
@@ -149,7 +148,6 @@ export const useMemoryStore = defineStore('memory', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Ollama-URL': this.settings.ollamaURL,
           },
           url: `${this.settings.backendURL}/api/chat`,
           data: {

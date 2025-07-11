@@ -393,7 +393,6 @@ export async function uploadRagFiles (
       headers: {
         'x-apollo-operation-name': 'UploadRagFiles',
         'Accept': 'application/json',
-        'X-Ollama-URL': ollamaURL,
       },
     });
     const { data, errors } = await response.json();
@@ -481,8 +480,6 @@ export async function searchRagFiles (
       ollamaURL,
       embeddingsModel,
       limit,
-    }, {
-      headers: { 'X-Ollama-URL': ollamaURL },
     });
     return searchRagFiles || [];
   } catch (error) {
