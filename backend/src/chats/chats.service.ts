@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { ChatEntity } from './chat.entity';
 import { MessageEntity } from './message.entity';
-import { ChatMetaInput, MessageInput } from './chats.input';
+import { ChatInput, ChatMetaInput, MessageInput } from './chats.input';
 
 @Injectable()
 export class ChatsService {
@@ -13,6 +13,19 @@ export class ChatsService {
     @InjectRepository(MessageEntity)
     private messageRepository: Repository<MessageEntity>,
   ) {}
+
+  async saveChat(chat: ChatInput): Promise<ChatEntity> {
+    const chatEntity = this.chatRepository.create({
+      ...chat,
+      systemPrompt: chat.systemPrompt,
+      messages: chat.messages.map((msg) => ({
+        ...msg,
+        timestamp: msg.timestamp ?? Date.now(),
+        chat: { id: chat.id },
+      })),
+    });
+    return this.chatRepository.save(chatEntity);
+  }
 
   async updateChatMeta(meta: ChatMetaInput): Promise<ChatEntity> {
     const chat = await this.chatRepository.findOne({ where: { id: meta.id } });

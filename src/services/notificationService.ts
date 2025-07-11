@@ -37,7 +37,6 @@ export class NotificationService {
       {
         next: ({ data }) => {
           if (data?.notificationTriggered) {
-            console.log('Получено уведомление:', data.notificationTriggered);
             this.triggerNotification(data.notificationTriggered as NotificationEvent);
           }
         },

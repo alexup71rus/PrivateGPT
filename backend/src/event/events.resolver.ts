@@ -46,7 +46,8 @@ export class EventsResolver {
 
   @Subscription(() => Event, {
     name: 'notificationTriggered',
-    resolve: (payload) => payload.notificationTriggered,
+    resolve: (payload: { notificationTriggered: EventEntity }) =>
+      payload.notificationTriggered,
   })
   notificationTriggered() {
     return this.pubSub.asyncIterableIterator('notificationTriggered');
