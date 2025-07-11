@@ -64,6 +64,7 @@ const menuItems = [
   { title: 'Search', path: '/settings/search', icon: 'mdi-magnify' },
   { title: 'Memory', path: '/settings/memory', icon: 'mdi-memory' },
   { title: 'RAG', path: '/settings/rag', icon: 'mdi-database' },
+  { title: 'Schedule', path: '/settings/schedule', icon: 'mdi-calendar' },
 ];
 const isActive = (path: string) => route.path === path;
 

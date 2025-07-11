@@ -18,6 +18,7 @@ declare module 'vue' {
     Rag: typeof import('./components/Pages/Settings/Rag.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    Schedule: typeof import('./components/Pages/Settings/Schedule.vue')['default']
     Search: typeof import('./components/Pages/Settings/Search.vue')['default']
     SidebarLayout: typeof import('./components/Outline/SidebarLayout.vue')['default']
     ThinkPreview: typeof import('./components/Pages/Chat/ThinkPreview.vue')['default']

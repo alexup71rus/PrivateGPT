@@ -8,50 +8,65 @@ import { useChatActions } from '@/composables/useChatActions.ts';
 import { useSettingsStore } from '@/stores/settings.ts';
 import { useMemoryStore } from '@/stores/memory.ts';
 import { waitForBackend } from '@/api/chats.ts';
+import { notificationService } from '@/services/notificationService';
 
 const app = useAppStore();
-  const chat = useChatStore();
-  const memory = useMemoryStore();
-  const settingsStore = useSettingsStore();
-  const { isChatPage } = useAppRouting();
-  const { initFromHash } = useChatActions();
+const chat = useChatStore();
+const memory = useMemoryStore();
+const settingsStore = useSettingsStore();
+const { isChatPage } = useAppRouting();
+const { initFromHash } = useChatActions();
 
-  const isElectron = !!(window as any).electronAPI;
-  const isLoaded = ref(false);
 
-  onMounted(async () => {
-    await chat.checkOllamaConnection();
-    await waitForBackend();
-    await chat.fetchModels();
-    await memory.fetchMemory();
-    await settingsStore.init();
+const isElectron = !!(window as any).electronAPI;
+const isLoaded = ref(false);
+onMounted(async () => {
+  await chat.checkOllamaConnection();
+  await waitForBackend();
+  await chat.fetchModels();
+  await memory.fetchMemory();
+  await settingsStore.init();
 
-    if (chat.error || window.location.pathname !== '/') {
-      isLoaded.value = true;
-      return;
-    }
+  notificationService.start()
 
-    await chat.fetchChats();
-    await nextTick();
-    await initFromHash();
-    if (chat.activeChatId) {
-      await chat.fetchChatMessages(chat.activeChatId);
-    }
-    await nextTick();
+  if (chat.error || window.location.pathname !== '/') {
     isLoaded.value = true;
-  });
+    return;
+  }
 
-  const minimizeWindow = () => {
-    (window as any).electronAPI.minimizeWindow();
-  };
+  await chat.fetchChats();
+  await nextTick();
+  await initFromHash();
+  if (chat.activeChatId) {
+    await chat.fetchChatMessages(chat.activeChatId);
+  }
+  await nextTick();
+  isLoaded.value = true;
+});
 
-  const maximizeWindow = () => {
-    (window as any).electronAPI.maximizeWindow();
-  };
+const minimizeWindow = () => {
+  (window as any).electronAPI.minimizeWindow();
+};
 
-  const closeWindow = () => {
-    (window as any).electronAPI.closeWindow();
-  };
+const maximizeWindow = () => {
+  (window as any).electronAPI.maximizeWindow();
+};
+
+const closeWindow = () => {
+  (window as any).electronAPI.closeWindow();
+};
+
+
+// if ('serviceWorker' in navigator) {
+//   navigator.serviceWorker.register('/sw.js').then(() => {
+//     if (Notification.permission !== 'granted') {
+//       Notification.requestPermission();
+//     }
+//   }).catch(error => {
+//     console.error('Ошибка регистрации Service Worker:', error);
+//     showSnackbar({ message: 'Не удалось зарегистрировать Service Worker', type: 'error' });
+//   });
+// }
 </script>
 
 <template>

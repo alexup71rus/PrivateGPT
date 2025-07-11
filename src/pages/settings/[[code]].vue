@@ -1,14 +1,15 @@
 <script lang="ts" setup>
-  import { computed, defineAsyncComponent } from 'vue';
-  import { useRoute } from 'vue-router';
+import { computed, defineAsyncComponent } from 'vue';
+import { useRoute } from 'vue-router';
 
-  const route = useRoute();
+const route = useRoute();
 
   const componentMap = {
     general: defineAsyncComponent(() => import('../../components/Pages/Settings/General.vue')),
     search: defineAsyncComponent(() => import('../../components/Pages/Settings/Search.vue')),
     memory: defineAsyncComponent(() => import('../../components/Pages/Settings/Memory.vue')),
     rag: defineAsyncComponent(() => import('../../components/Pages/Settings/Rag.vue')),
+    schedule: defineAsyncComponent(() => import('../../components/Pages/Settings/Schedule.vue')),
   } as const;
 
   const settingsComponent = computed(() => {
