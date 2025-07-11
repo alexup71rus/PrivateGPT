@@ -13,6 +13,7 @@ import { LinkParserModule } from './link-parser/link-parser.module';
 import { WebUtilsModule } from './web-utils/web-utils.module';
 import { RagModule } from './rag/rag.module';
 import { SettingsModule } from './settings/settings.module';
+import { EventsModule } from './event/events.module';
 
 const isElectron = process.versions.electron !== undefined;
 const basePath: string = (() => {
@@ -31,7 +32,9 @@ const basePath: string = (() => {
       autoSchemaFile: join(basePath, 'schema.gql'),
       playground: true,
       context: ({ req }: { req: unknown }) => ({ req }),
-      installSubscriptionHandlers: true,
+      subscriptions: {
+        'graphql-ws': true,
+      },
     }),
     TypeOrmModule.forRoot({
       type: 'sqljs',
@@ -48,6 +51,7 @@ const basePath: string = (() => {
     SearchModule,
     LinkParserModule,
     RagModule,
+    EventsModule,
     SettingsModule,
   ],
   controllers: [AppController],

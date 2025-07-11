@@ -22,8 +22,7 @@ const isLoaded = ref(false);
 
 onMounted(async () => {
   await settingsStore.init();
-
-  // Proceed with other async operations
+  await app.init();
   await Promise.all([
     chat.checkOllamaConnection(),
     waitForBackend(),
@@ -31,7 +30,7 @@ onMounted(async () => {
     memory.fetchMemory(),
   ]);
 
-  notificationService.start();
+  await notificationService.start();
 
   if (chat.error || window.location.pathname !== '/') {
     isLoaded.value = true;

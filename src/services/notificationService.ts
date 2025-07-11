@@ -1,67 +1,71 @@
-import { type Event, getEvents, updateEvent } from '@/utils/taskScheduler';
+import { createClient } from 'graphql-ws';
+import { NOTIFICATION_TRIGGERED } from '@/api/tasks';
 
 const DEFAULT_ICON = '/logo.svg';
 const NOTIFY_ICON = '/public/logo-notify.svg';
 const NOTIFY_SOUND = '/public/notify.mp3';
 
+interface NotificationEvent {
+  id: string;
+  title: string;
+  prompt: string;
+}
+
 export class NotificationService {
-  private intervalId: number | null = null;
+  private wsClient: ReturnType<typeof createClient> | null = null;
   private flashInterval: number | null = null;
   private resetTimeout: number | null = null;
   private isNotifyIcon: boolean = true;
-  private checkInterval = 10000;
   private flashDuration = 120000;
   private flashSpeed = 500;
 
-  start() {
-    if (this.intervalId) return;
-    this.intervalId = window.setInterval(() => this.checkTasks(), this.checkInterval);
-    this.checkTasks();
+  async start() {
+    const port = (window as any).electronAPI
+      ? await (window as any).electronAPI.getBackendPort()
+      : 3001;
+    const wsUrl = `ws://localhost:${port}/graphql`;
+
+    console.log(`Подключение WebSocket к ${wsUrl}`);
+
+    this.wsClient = createClient({
+      url: wsUrl,
+      shouldRetry: () => true,
+    });
+
+    this.wsClient.subscribe(
+      { query: NOTIFICATION_TRIGGERED.loc!.source.body },
+      {
+        next: ({ data }) => {
+          if (data?.notificationTriggered) {
+            console.log('Получено уведомление:', data.notificationTriggered);
+            this.triggerNotification(data.notificationTriggered as NotificationEvent);
+          }
+        },
+        error: (error) => {
+          console.error('Ошибка подписки:', error);
+        },
+        complete: () => {
+          console.log('Подписка завершена');
+        },
+      },
+    );
   }
 
   stop() {
-    if (this.intervalId) {
-      clearInterval(this.intervalId);
-      this.intervalId = null;
-    }
     this.stopFlashing();
-  }
-
-  private async checkTasks() {
-    try {
-      const events = await getEvents();
-      const now = new Date();
-      const currentHour = now.getHours();
-      const currentMin = now.getMinutes();
-      const currentDay = now.toLocaleString('en-US', { weekday: 'long' });
-      const currentDate = now.toISOString().split('T')[0];
-
-      for (const event of events) {
-        const [eventHour, eventMin] = event.time.split(':').map(Number);
-        const timeDiffMin = (currentHour - eventHour) * 60 + (currentMin - eventMin);
-        const isTimeWindow = timeDiffMin >= 0 && timeDiffMin <= 2;
-        const isDayMatch = event.isRecurring
-          ? event.days.includes(currentDay)
-          : event.specificDate === currentDate;
-        const isAlreadyNotified = event.lastNotified === currentDate;
-
-        if (isTimeWindow && isDayMatch && !isAlreadyNotified) {
-          await this.triggerNotification(event);
-          await updateEvent({ ...event, lastNotified: currentDate });
-        }
-      }
-    } catch (error) {
-      console.error('Ошибка при проверке задач:', error);
+    if (this.wsClient) {
+      this.wsClient.dispose();
+      this.wsClient = null;
     }
   }
 
-  private async triggerNotification(event: Event) {
-    if ("Notification" in window) {
+  private async triggerNotification(event: NotificationEvent) {
+    if ('Notification' in window) {
       let permission = Notification.permission;
-      if (permission === "default") {
+      if (permission === 'default') {
         permission = await Notification.requestPermission();
       }
-      if (permission === "granted") {
+      if (permission === 'granted') {
         new Notification(event.title, {
           body: event.prompt,
           icon: NOTIFY_ICON,

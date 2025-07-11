@@ -11,6 +11,9 @@ export const useSettingsStore = defineStore('settings', {
     isLoadedRag: ref(false),
   }),
   getters: {
+    isAsideOpen: state => {
+      return state.settings.isAsideOpen
+    },
     isDarkTheme: state => {
       if (state.settings.theme === 'system') {
         return state.systemThemeDark;

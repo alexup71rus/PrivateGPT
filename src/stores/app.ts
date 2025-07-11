@@ -8,7 +8,7 @@ export const useAppStore = defineStore('app', {
     const { http } = useHttpService();
     return {
       http,
-      isAsideOpen: false,
+      isAsideOpen: true,
     };
   },
   getters: {
@@ -22,9 +22,7 @@ export const useAppStore = defineStore('app', {
     },
     setAside(value: boolean) {
       this.isAsideOpen = value;
-      useSettingsStore().updateSettings({
-        isAsideOpen: value,
-      });
+      useSettingsStore().updateSettings({ isAsideOpen: value });
     },
   },
 })

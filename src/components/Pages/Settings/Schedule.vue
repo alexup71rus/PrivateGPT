@@ -1,9 +1,11 @@
 <script lang="ts" setup>
 import { computed, ref } from 'vue';
 import { useAlert } from '@/plugins/alertPlugin';
-import { addEvent, deleteEvent, type Event, getEvents, updateEvent } from '@/utils/taskScheduler.ts';
+import { useTaskStore } from '@/stores/taskStore';
+import type { Event } from '../../../types/tasks';
 
 const { showSnackbar } = useAlert();
+const taskStore = useTaskStore();
 
 const newTask = ref<Event>({
   id: '',
@@ -18,7 +20,6 @@ const newTask = ref<Event>({
 });
 
 const maxEvents = 30;
-const events = ref<Event[]>([]);
 const isAdding = ref(false);
 const isEditing = ref(false);
 const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -30,10 +31,10 @@ const isFormValid = computed(() =>
   (newTask.value.isRecurring ? newTask.value.days.length > 0 : !!newTask.value.specificDate)
 );
 
-const eventCountValid = computed(() => !isEditing.value && events.value.length >= maxEvents);
+const eventCountValid = computed(() => !isEditing.value && taskStore.events.length >= maxEvents);
 
 const loadEvents = async () => {
-  events.value = await getEvents();
+  await taskStore.fetchTasks();
 };
 
 const addTask = async () => {
@@ -58,8 +59,7 @@ const addTask = async () => {
       enableSearch: newTask.value.enableSearch,
       lastNotified: '',
     };
-    await addEvent(task);
-    await loadEvents();
+    await taskStore.addTask(task);
     resetForm();
     showSnackbar({ message: 'Task added', type: 'success' });
   } catch (error) {
@@ -77,7 +77,7 @@ const updateTask = async () => {
   }
   try {
     isAdding.value = true;
-    const oldEvent = events.value.find(e => e.id === newTask.value.id);
+    const oldEvent = taskStore.events.find(e => e.id === newTask.value.id);
     let lastNotified = newTask.value.lastNotified || '';
     if (oldEvent) {
       const timeChanged = oldEvent.time !== newTask.value.time;
@@ -99,8 +99,7 @@ const updateTask = async () => {
       enableSearch: newTask.value.enableSearch,
       lastNotified,
     };
-    await updateEvent(task);
-    await loadEvents();
+    await taskStore.updateTask(task);
     resetForm();
     showSnackbar({ message: 'Task updated', type: 'success' });
   } catch (error) {
@@ -123,8 +122,7 @@ const resetForm = () => {
 
 const deleteTask = async (id: string) => {
   try {
-    await deleteEvent(id);
-    await loadEvents();
+    await taskStore.deleteTask(id);
     showSnackbar({ message: 'Task deleted', type: 'success' });
   } catch (error) {
     showSnackbar({ message: 'Error deleting task', type: 'error' });
@@ -167,7 +165,7 @@ loadEvents();
 
         <v-switch
           v-model="newTask.enableSearch"
-          label="Enable search"
+          label="Enable web search"
           class="mb-4"
           color="blue"
         />
@@ -216,8 +214,8 @@ loadEvents();
       <v-divider class="my-6" />
       <h3 class="section-subtitle">Scheduled Tasks</h3>
 
-      <v-list v-if="events.length" class="prompt-list">
-        <v-list-item v-for="event in events" :key="event.id" class="prompt-item">
+      <v-list v-if="taskStore.events.length" class="prompt-list">
+        <v-list-item v-for="event in taskStore.events" :key="event.id" class="prompt-item">
           <div class="prompt-content">
             <div class="content-title">{{ event.title }}</div>
             <div class="content-details">{{ event.prompt }}</div>

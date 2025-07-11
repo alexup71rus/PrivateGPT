@@ -28,6 +28,14 @@ const { handleFirstClick, handleSecondClick, resetDeletePending, isPending } = u
 const searchQuery = ref<string>('');
 const selectedPromptFilter = ref<string | null>(null);
 
+// Compute sidebar state: open for settings pages, otherwise use stored value
+const isSidebarOpen = computed(() => {
+  if (route.path.startsWith('/settings')) {
+    return true;
+  }
+  return app.isAsideOpen;
+});
+
 const groupedChats = computed(() => {
   const groups: { [key: string]: Chat[] } = {};
   const sortedChats = [...chat.chats]
@@ -157,24 +165,24 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div :class="['sidebar', { 'sidebar--opened': app.isAsideOpen, 'sidebar-chat': isChatPage }]">
+  <div :class="['sidebar', { 'sidebar--opened': isSidebarOpen, 'sidebar-chat': isChatPage }]">
     <div class="sidebar__collapsed-item">
       <v-btn
         class="sidebar__burger"
-        :icon="app.isAsideOpen ? 'mdi-backburger' : 'mdi-menu'"
+        :icon="isSidebarOpen ? 'mdi-backburger' : 'mdi-menu'"
         @click="app.setAside(!app.isAsideOpen)"
       />
       <img
         alt="Chat logo"
         class="sidebar__logo"
-        :class="{ 'fade-in': app.isAsideOpen, 'fade-out': !app.isAsideOpen }"
+        :class="{ 'fade-in': isSidebarOpen, 'fade-out': !isSidebarOpen }"
         src="@/assets/logo.svg"
       >
       <v-btn class="new-chat-btn" icon="mdi-autorenew" @click="onNewChat" />
     </div>
 
     <transition name="fade">
-      <div v-if="app.isAsideOpen" class="chats-container">
+      <div v-if="isSidebarOpen" class="chats-container">
         <template v-if="isChatPage">
           <v-text-field
             v-model="searchQuery"
