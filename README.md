@@ -14,17 +14,16 @@
 * 🧠 Persistent memory (summarization-based), like GPT
 * 🔍 Internet search and check provided links
 * * 🔎 Chat sessions with system prompt filters
+* ✅ Daily Task Planning & News Digest
 * 📄 Upload and analyze text documents (RAG supports `.txt`, more formats planned)
 * 🖼️ Supports image input in chat
 * ⚡ Quick system prompt snippets
-* ⚙️ Minimal, easily adaptable codebase
 
 ### 🚀 In Development
 
-* 🔗 Chat list with system prompt filters
+* 🗋 Better support for various document formats in RAG
 * 🎤 Voice chat support
 * 🚀 Support for third-party API tools
-* 🗋 Better support for various document formats in RAG
 
 ### ⚙️ Required Models
 
@@ -82,7 +81,6 @@ pnpm dev:electron
 
 ### 🌐 Roadmap
 
-* ✅ Daily Task Planning & News Digest
 * 🔍 Better local document indexing and RAG refinement
 * 🎤 Optional voice input/output (speech-to-text + TTS)
 * ⚖️ API integration support (external tools or agents)
