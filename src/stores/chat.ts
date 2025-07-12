@@ -25,7 +25,7 @@ import {
   handleError,
   processStream,
 } from '@/utils/helpers.ts';
-import { type ISettings } from '../types/settings.ts';
+import { type ISettings, type SystemPrompt } from '../types/settings.ts';
 import { useSettingsStore } from '@/stores/settings.ts';
 import { useMemoryStore } from '@/stores/memory.ts';
 import type { SearchResultItem } from '../../backend/src/search/search.service.ts';
@@ -98,6 +98,18 @@ export const useChatStore = defineStore('chat', {
         this.error = handleError(err, 'Failed to load chats');
       } finally {
         this.loading = false;
+      }
+    },
+
+    fetchChatById(chat: Chat) {
+      const exists = this.chats.find(c => c.id === chat.id);
+      if (!exists) {
+        this.chats.unshift({
+          ...chat,
+          messages: [],
+        });
+        this.chats.sort((a, b) => b.timestamp - a.timestamp);
+        this.syncActiveChat();
       }
     },
 

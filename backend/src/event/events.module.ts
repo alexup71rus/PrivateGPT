@@ -1,28 +1,30 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ScheduleModule } from '@nestjs/schedule';
-import { HttpModule } from '@nestjs/axios';
-import { EventsResolver } from './events.resolver';
-import { EventsService } from './events.service';
 import { EventEntity } from './event.entity';
+import { EventsService } from './events.service';
+import { EventsResolver } from './events.resolver';
 import { PubSub } from 'graphql-subscriptions';
 import { ChatsModule } from '../chats/chats.module';
 import { SettingsModule } from '../settings/settings.module';
+import { HttpModule } from '@nestjs/axios';
+import { ScheduleModule } from '@nestjs/schedule';
+import { SearchModule } from '../search/search.module'; // Импорт SearchModule
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([EventEntity]),
-    ScheduleModule.forRoot(),
-    HttpModule,
     ChatsModule,
     SettingsModule,
+    HttpModule,
+    ScheduleModule.forRoot(),
+    SearchModule,
   ],
   providers: [
-    EventsResolver,
     EventsService,
+    EventsResolver,
     {
       provide: 'PUB_SUB',
-      useFactory: () => new PubSub(),
+      useValue: new PubSub(),
     },
   ],
 })

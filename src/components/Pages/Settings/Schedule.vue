@@ -2,10 +2,12 @@
 import { computed, ref } from 'vue';
 import { useAlert } from '@/plugins/alertPlugin';
 import { useTaskStore } from '@/stores/taskStore';
-import type { Event } from '../../../types/tasks';
+import { useChatStore } from '@/stores/chat';
+import type { Event } from '@/types/tasks.ts';
 
 const { showSnackbar } = useAlert();
 const taskStore = useTaskStore();
+const chatStore = useChatStore();
 
 const newTask = ref<Event>({
   id: '',
@@ -17,12 +19,18 @@ const newTask = ref<Event>({
   specificDate: '',
   enableSearch: false,
   lastNotified: '',
+  model: '',
 });
 
 const maxEvents = 30;
 const isAdding = ref(false);
 const isEditing = ref(false);
 const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+const availableModels = computed(() => [
+  { name: 'Use system model', details: '', size: '', value: '' },
+  ...(chatStore.models || []).map(model => ({ name: model.name, details: model.details, size: model.size, value: model.name })),
+]);
 
 const isFormValid = computed(() =>
   newTask.value.title &&
@@ -58,6 +66,7 @@ const addTask = async () => {
       specificDate: newTask.value.isRecurring ? '' : newTask.value.specificDate,
       enableSearch: newTask.value.enableSearch,
       lastNotified: '',
+      model: newTask.value.model,
     };
     await taskStore.addTask(task);
     resetForm();
@@ -98,6 +107,7 @@ const updateTask = async () => {
       specificDate: newTask.value.isRecurring ? '' : newTask.value.specificDate,
       enableSearch: newTask.value.enableSearch,
       lastNotified,
+      model: newTask.value.model,
     };
     await taskStore.updateTask(task);
     resetForm();
@@ -111,12 +121,12 @@ const updateTask = async () => {
 };
 
 const editTask = (event: Event) => {
-  newTask.value = { ...event, days: [...event.days] };
+  newTask.value = { ...event, days: [...event.days], model: event.model || '' };
   isEditing.value = true;
 };
 
 const resetForm = () => {
-  newTask.value = { id: '', title: '', prompt: '', time: '', isRecurring: false, days: [], specificDate: '', enableSearch: false, lastNotified: '' };
+  newTask.value = { id: '', title: '', prompt: '', time: '', isRecurring: false, days: [], specificDate: '', enableSearch: false, lastNotified: '', model: '' };
   isEditing.value = false;
 };
 
@@ -160,6 +170,16 @@ loadEvents();
           label="Time (24h format, e.g., 10:00)"
           type="time"
           :rules="[v => !!v || 'Required field']"
+          variant="solo-filled"
+        />
+
+        <v-select
+          v-model="newTask.model"
+          class="mb-4"
+          :items="availableModels"
+          item-title="name"
+          item-value="value"
+          label="Model"
           variant="solo-filled"
         />
 
@@ -225,6 +245,7 @@ loadEvents();
             </div>
             <div class="content-details" v-else>Date: {{ event.specificDate }}</div>
             <div class="content-details">Search: {{ event.enableSearch ? 'Enabled' : 'Disabled' }}</div>
+            <div class="content-details">Model: {{ event.model || 'System model' }}</div>
           </div>
           <template #append>
             <v-btn

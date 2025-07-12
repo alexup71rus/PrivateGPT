@@ -28,4 +28,7 @@ export class EventInput {
 
   @Field({ nullable: true })
   lastNotified?: string;
+
+  @Field({ nullable: true })
+  model?: string;
 }

@@ -14,6 +14,10 @@ export class ChatsService {
     private messageRepository: Repository<MessageEntity>,
   ) {}
 
+  async findOne(id: string): Promise<ChatEntity | null> {
+    return this.chatRepository.findOne({ where: { id } });
+  }
+
   async saveChat(chat: ChatInput): Promise<ChatEntity> {
     const chatEntity = this.chatRepository.create({
       ...chat,

@@ -34,4 +34,10 @@ export class Event {
 
   @Field({ nullable: true })
   updatedAt?: Date;
+
+  @Field({ nullable: true })
+  chatId?: string;
+
+  @Field({ nullable: true })
+  model?: string;
 }

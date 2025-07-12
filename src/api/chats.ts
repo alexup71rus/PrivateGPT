@@ -55,6 +55,27 @@ export async function loadChats (): Promise<Chat[]> {
   }
 }
 
+export async function loadChatById(chatId: string): Promise<Chat | null> {
+  try {
+    const client = await getGraphQLClient();
+    const query = gql`
+      query GetChatById($chatId: String!) {
+        getChatById(id: $chatId) {
+          id
+          title
+          timestamp
+          systemPrompt
+        }
+      }
+    `;
+    const { getChatById } = await client.request<{ getChatById: Chat }>(query, { chatId });
+    return getChatById || null;
+  } catch (error) {
+    handleGraphQLError(error);
+    return null;
+  }
+}
+
 export async function loadChatMessages (chatId: string): Promise<Message[]> {
   try {
     const client = await getGraphQLClient();

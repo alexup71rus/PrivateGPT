@@ -15,10 +15,13 @@ export const useSettingsStore = defineStore('settings', {
       return state.settings.isAsideOpen
     },
     isDarkTheme: state => {
-      if (state.settings.theme === 'system') {
-        return state.systemThemeDark;
-      }
-      return state.settings.theme === 'dark';
+      // TODO: light theme
+      // if (state.settings.theme === 'system') {
+      //   return state.systemThemeDark;
+      // }
+      // return state.settings.theme === 'dark';
+
+      return true;
     },
   },
   actions: {

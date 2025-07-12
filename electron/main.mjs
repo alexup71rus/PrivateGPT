@@ -1,11 +1,20 @@
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
-import { existsSync, readFileSync } from 'fs';
+import { createWriteStream, existsSync, mkdirSync, readFileSync } from 'fs';
 import http, { createServer } from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const logDir = path.join(app.getPath('logs'), 'Plama');
+mkdirSync(logDir, { recursive: true });
+const logStream = createWriteStream(path.join(logDir, 'app.log'), { flags: 'a' });
+const log = (...args) => {
+  try {
+    logStream.write(`[${new Date().toISOString()}] ${args.join(' ')}\n`);
+  } catch {}
+};
 
 const config = {
   backend: {
@@ -22,6 +31,7 @@ let mainWindow = null;
 let frontendServer = null;
 
 if (!app.requestSingleInstanceLock()) {
+  log('Second instance detected, quitting');
   app.quit();
 }
 
@@ -53,7 +63,8 @@ if (process.argv.includes('--dev') || process.env.NODE_ENV === 'development') {
       }[ext] || 'text/html';
       res.writeHead(200, { 'Content-Type': contentType });
       res.end(content);
-    } catch {
+    } catch (err) {
+      log('Frontend server error:', err.message);
       res.writeHead(404);
       res.end();
     }
@@ -63,24 +74,39 @@ if (process.argv.includes('--dev') || process.env.NODE_ENV === 'development') {
 
 async function startBackend() {
   if (!existsSync(config.backend.entry)) {
+    log('Backend entry file not found');
     throw new Error('Backend entry file not found');
   }
   Object.assign(process.env, config.backend.env, { NODE_ENV: 'production' });
   return import(config.backend.entry);
 }
 
-function waitForBackend(attempts = 20, interval = 1000) {
+function waitForBackend(attempts = 10, interval = 1000) {
   return new Promise((resolve, reject) => {
     const tryConnect = attempt => {
-      const req = http.get(`http://localhost:${config.backend.port}/api/tags`, res => {
-        if ([200, 400, 404].includes(res.statusCode)) resolve();
-        else if (attempt <= 0) reject(new Error('Backend not ready'));
-        else setTimeout(() => tryConnect(attempt - 1), interval);
+      const req = http.request(
+        {
+          method: 'POST',
+          hostname: 'localhost',
+          port: config.backend.port,
+          path: '/graphql',
+          headers: { 'Content-Type': 'application/json' },
+        },
+        res => {
+          if ([200, 400].includes(res.statusCode)) resolve();
+          else if (attempt <= 0) {
+            log('Backend not ready after attempts');
+            reject(new Error('Backend not ready'));
+          } else setTimeout(() => tryConnect(attempt - 1), interval);
+        }
+      );
+      req.on('error', err => {
+        if (attempt <= 0) {
+          log('Backend connection error:', err.message);
+          reject(new Error('Backend not ready'));
+        } else setTimeout(() => tryConnect(attempt - 1), interval);
       });
-      req.on('error', () => {
-        if (attempt <= 0) reject(new Error('Backend not ready'));
-        else setTimeout(() => tryConnect(attempt - 1), interval);
-      });
+      req.write(JSON.stringify({ query: '{ healthCheck }' }));
       req.end();
     };
     tryConnect(attempts);
@@ -92,12 +118,16 @@ function waitForVite(attempts = 20, interval = 1000) {
     const tryConnect = attempt => {
       const req = http.get(`http://localhost:${config.frontend.port}`, res => {
         if (res.statusCode === 200) resolve();
-        else if (attempt <= 0) reject(new Error('Vite server not ready'));
-        else setTimeout(() => tryConnect(attempt - 1), interval);
+        else if (attempt <= 0) {
+          log('Vite server not ready after attempts');
+          reject(new Error('Vite server not ready'));
+        } else setTimeout(() => tryConnect(attempt - 1), interval);
       });
-      req.on('error', () => {
-        if (attempt <= 0) reject(new Error('Vite server not ready'));
-        else setTimeout(() => tryConnect(attempt - 1), interval);
+      req.on('error', err => {
+        if (attempt <= 0) {
+          log('Vite server connection error:', err.message);
+          reject(new Error('Vite server not ready'));
+        } else setTimeout(() => tryConnect(attempt - 1), interval);
       });
       req.end();
     };
@@ -149,20 +179,29 @@ function createWindow() {
   });
   const frontendUrl = `http://localhost:${config.frontend.port}`;
   if (isDev) {
-    mainWindow.loadURL(frontendUrl).catch(() => app.quit());
+    mainWindow.loadURL(frontendUrl).catch(err => {
+      log('Failed to load dev URL:', err.message);
+      app.quit();
+    });
   } else {
     const distPath = path.join(__dirname, '../dist/index.html');
     if (!existsSync(distPath)) {
+      log('Dist index.html not found');
       app.quit();
     }
-    mainWindow.loadFile(distPath);
+    mainWindow.loadFile(distPath).catch(err => {
+      log('Failed to load prod file:', err.message);
+      app.quit();
+    });
   }
   mainWindow.webContents.on('did-finish-load', () => {
     if (isDev) mainWindow.webContents.openDevTools();
     mainWindow.webContents.send('backend-port', config.backend.port);
   });
-  mainWindow.webContents.on('did-fail-load', () => {
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+    log(`Page load failed: code=${errorCode}, desc=${errorDescription}, URL=${validatedURL}`);
     if (config.reloadAttempts <= 0) {
+      log('No reload attempts left, quitting');
       app.quit();
       return;
     }
@@ -170,9 +209,7 @@ function createWindow() {
     setTimeout(() => mainWindow.reload(), 500);
   });
   setupIpcHandlers();
-  mainWindow.on('closed', () => {
-    mainWindow = null;
-  });
+  mainWindow.on('closed', () => mainWindow = null);
 }
 
 function cleanup() {
@@ -186,11 +223,10 @@ app.whenReady().then(async () => {
   try {
     await startBackend();
     await waitForBackend();
-    if (process.argv.includes('--dev') || process.env.NODE_ENV === 'development') {
-      await waitForVite();
-    }
+    if (process.argv.includes('--dev') || process.env.NODE_ENV === 'development') await waitForVite();
     createWindow();
-  } catch {
+  } catch (err) {
+    log('Startup error:', err.message);
     app.quit();
   }
 });

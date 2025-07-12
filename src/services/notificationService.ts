@@ -1,14 +1,17 @@
 import { createClient } from 'graphql-ws';
 import { NOTIFICATION_TRIGGERED } from '@/api/tasks';
+import { useChatStore } from '@/stores/chat';
+import { loadChatById } from '@/api/chats';
 
 const DEFAULT_ICON = '/logo.svg';
-const NOTIFY_ICON = '/public/logo-notify.svg';
-const NOTIFY_SOUND = '/public/notify.mp3';
+const NOTIFY_ICON = '/logo-notify.svg';
+const NOTIFY_SOUND = '/notify.mp3';
 
 interface NotificationEvent {
   id: string;
   title: string;
   prompt: string;
+  chatId: string;
 }
 
 export class NotificationService {
@@ -18,14 +21,13 @@ export class NotificationService {
   private isNotifyIcon: boolean = true;
   private flashDuration = 120000;
   private flashSpeed = 500;
+  private baseUrl = 'http://localhost:3002';
 
   async start() {
     const port = (window as any).electronAPI
       ? await (window as any).electronAPI.getBackendPort()
       : 3001;
     const wsUrl = `ws://localhost:${port}/graphql`;
-
-    console.log(`Подключение WebSocket к ${wsUrl}`);
 
     this.wsClient = createClient({
       url: wsUrl,
@@ -38,14 +40,14 @@ export class NotificationService {
         next: ({ data }) => {
           if (data?.notificationTriggered) {
             this.triggerNotification(data.notificationTriggered as NotificationEvent);
+          } else {
+            console.error('No notificationTriggered data received');
           }
         },
         error: (error) => {
-          console.error('Ошибка подписки:', error);
+          console.error('Subscription error:', error);
         },
-        complete: () => {
-          console.log('Подписка завершена');
-        },
+        complete() {},
       },
     );
   }
@@ -59,16 +61,33 @@ export class NotificationService {
   }
 
   private async triggerNotification(event: NotificationEvent) {
+    const chatStore = useChatStore();
+    if (event.chatId) {
+      const newChat = await loadChatById(event.chatId);
+      if (newChat) {
+        chatStore.fetchChatById(newChat);
+        await chatStore.fetchChatMessages(event.chatId);
+      } else {
+        console.error('Failed to load chat with ID:', event.chatId);
+      }
+    } else {
+      console.error('No chatId in notification event:', event);
+    }
+
     if ('Notification' in window) {
       let permission = Notification.permission;
       if (permission === 'default') {
         permission = await Notification.requestPermission();
       }
       if (permission === 'granted') {
-        new Notification(event.title, {
-          body: event.prompt,
+        const notification = new Notification(event.title, {
+          body: `${event.prompt}\nOpen chat: ${this.baseUrl}/#${event.chatId}`,
           icon: NOTIFY_ICON,
         });
+        notification.onclick = () => {
+          window.location.href = `${this.baseUrl}/#${event.chatId}`;
+          window.focus();
+        };
       }
     }
 
@@ -82,7 +101,7 @@ export class NotificationService {
 
     const playSound = () => {
       const audio = new Audio(NOTIFY_SOUND);
-      audio.play().catch(() => {});
+      audio.play().catch((error) => console.error('Failed to play notification sound:', error));
     };
 
     if (document.visibilityState === 'visible' && document.hasFocus()) {

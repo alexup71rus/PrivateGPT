@@ -9,6 +9,8 @@ export const NOTIFICATION_TRIGGERED: DocumentNode = gql`
       id
       title
       prompt
+      chatId
+      model
     }
   }
 `;
@@ -28,6 +30,7 @@ export async function loadTasks(): Promise<Event[] | null> {
           specificDate
           enableSearch
           lastNotified
+          model
         }
       }
     `;
@@ -55,6 +58,7 @@ export async function createTask(event: Event): Promise<Event | null> {
           specificDate
           enableSearch
           lastNotified
+          model
         }
       }
     `;
@@ -82,6 +86,7 @@ export async function updateTask(event: Event): Promise<Event | null> {
           specificDate
           enableSearch
           lastNotified
+          model
         }
       }
     `;

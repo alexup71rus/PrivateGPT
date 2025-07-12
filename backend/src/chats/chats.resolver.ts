@@ -123,6 +123,12 @@ export class ChatsResolver {
     return chatEntities.map(this.mapChatEntityToChat);
   }
 
+  @Query(() => Chat, { nullable: true })
+  async getChatById(@Args('id') id: string): Promise<Chat | null> {
+    const chatEntity = await this.chatsService.findOne(id);
+    return chatEntity ? this.mapChatEntityToChat(chatEntity) : null;
+  }
+
   @Query(() => [Message])
   async getChatMessages(@Args('chatId') chatId: string): Promise<Message[]> {
     const chatEntity = await this.chatRepository

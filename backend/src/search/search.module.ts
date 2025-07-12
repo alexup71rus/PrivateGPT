@@ -6,5 +6,6 @@ import { WebUtilsModule } from '../web-utils/web-utils.module';
 @Module({
   imports: [WebUtilsModule],
   providers: [SearchResolver, SearchService],
+  exports: [SearchService, SearchResolver],
 })
 export class SearchModule {}

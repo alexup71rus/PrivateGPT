@@ -35,9 +35,15 @@ export class EventEntity {
   @Column({ nullable: true })
   lastNotified?: string;
 
+  @Column({ nullable: true })
+  chatId?: string;
+
   @CreateDateColumn()
   createdAt: Date;
 
   @UpdateDateColumn({ nullable: true })
   updatedAt?: Date;
+
+  @Column({ nullable: true })
+  model?: string;
 }

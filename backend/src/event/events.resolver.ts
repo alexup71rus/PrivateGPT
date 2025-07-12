@@ -32,6 +32,7 @@ export class EventsResolver {
       where: { id: event.id },
     });
     if (!existingEvent) {
+      console.error(`Event with ID ${event.id} not found`);
       throw new Error(`Event with ID ${event.id} not found`);
     }
     const updatedEvent = this.eventRepository.merge(existingEvent, event);
@@ -41,13 +42,15 @@ export class EventsResolver {
   @Mutation(() => Boolean)
   async deleteEvent(@Args('id') id: string): Promise<boolean> {
     const result = await this.eventRepository.delete(id);
+    if (!result.affected) {
+      console.error(`Failed to delete event with ID ${id}`);
+    }
     return result.affected ? result.affected > 0 : false;
   }
 
   @Subscription(() => Event, {
     name: 'notificationTriggered',
-    resolve: (payload: { notificationTriggered: EventEntity }) =>
-      payload.notificationTriggered,
+    resolve: ({ notificationTriggered }) => notificationTriggered,
   })
   notificationTriggered() {
     return this.pubSub.asyncIterableIterator('notificationTriggered');

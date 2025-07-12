@@ -8,4 +8,5 @@ export interface Event {
   specificDate: string;
   enableSearch: boolean;
   lastNotified?: string;
+  model?: string;
 }
