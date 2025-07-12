@@ -31,7 +31,6 @@ let mainWindow = null;
 let frontendServer = null;
 
 if (!app.requestSingleInstanceLock()) {
-  log('Second instance detected, quitting');
   app.quit();
 }
 
@@ -188,10 +187,24 @@ function createWindow() {
     if (!existsSync(distPath)) {
       log('Dist index.html not found');
       app.quit();
+      return;
     }
     mainWindow.loadFile(distPath).catch(err => {
       log('Failed to load prod file:', err.message);
       app.quit();
+    });
+    mainWindow.webContents.on('will-navigate', (event, url) => {
+      const parsedUrl = new URL(url);
+      if (parsedUrl.protocol === 'file:') {
+        event.preventDefault();
+        mainWindow.loadFile(distPath).catch(err => {
+          log('Failed to reload index.html:', err.message);
+          app.quit();
+        });
+      }
+    });
+    mainWindow.webContents.on('did-navigate', () => {
+      config.reloadAttempts = 5;
     });
   }
   mainWindow.webContents.on('did-finish-load', () => {
@@ -199,14 +212,20 @@ function createWindow() {
     mainWindow.webContents.send('backend-port', config.backend.port);
   });
   mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
-    log(`Page load failed: code=${errorCode}, desc=${errorDescription}, URL=${validatedURL}`);
     if (config.reloadAttempts <= 0) {
-      log('No reload attempts left, quitting');
+      log(`Page load failed: code=${errorCode}, desc=${errorDescription}, URL=${validatedURL}`);
       app.quit();
       return;
     }
     config.reloadAttempts--;
-    setTimeout(() => mainWindow.reload(), 500);
+    setTimeout(() => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.loadFile(path.join(__dirname, '../dist/index.html')).catch(err => {
+          log('Reload failed:', err.message);
+          app.quit();
+        });
+      }
+    }, 1000);
   });
   setupIpcHandlers();
   mainWindow.on('closed', () => mainWindow = null);
@@ -223,7 +242,9 @@ app.whenReady().then(async () => {
   try {
     await startBackend();
     await waitForBackend();
-    if (process.argv.includes('--dev') || process.env.NODE_ENV === 'development') await waitForVite();
+    if (process.argv.includes('--dev') || process.env.NODE_ENV === 'development') {
+      await waitForVite();
+    }
     createWindow();
   } catch (err) {
     log('Startup error:', err.message);
