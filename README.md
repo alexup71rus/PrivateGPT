@@ -13,11 +13,11 @@
 * 💬 Works with local LLMs via **Ollama**
 * 🧠 Persistent memory (summarization-based), like GPT
 * 🔍 Internet search and check provided links
-* * 🔎 Chat sessions with system prompt filters
 * ✅ Daily Task Planning & News Digest
 * 📄 Upload and analyze text documents (RAG supports `.txt`, more formats planned)
 * 🖼️ Supports image input in chat
 * ⚡ Quick system prompt snippets
+* 🔎 Chat sessions with system prompt filters
 
 ### 🚀 In Development
 
