@@ -2,6 +2,8 @@
 
 <img src="./src/assets/logo.svg" alt="Logo" width="100" />
 
+[Download now](https://github.com/alexup71rus/plama/releases)
+
 ### 💡 Why Plama?
 
 > A full-featured local AI client with private memory, fast search, flexible prompts, and a clean codebase you can extend freely.
