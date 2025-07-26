@@ -431,7 +431,7 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  height: calc(100vh - 450px);
+  height: 0;
   overflow-y: auto;
   flex: 1 1 auto;
   min-height: 0;
